@@ -1,0 +1,79 @@
+{
+  "name": "vs-workspace-todo",
+  "displayName": "Workspace Todo",
+  "description": "Workspace-scoped todo list with markdown support",
+  "version": "0.1.0",
+  "publisher": "workspace-todo",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/minhquankq/vs-workspace-todo"
+  },
+  "engines": {
+    "vscode": "^1.120.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "workspace-todo-container",
+          "title": "Workspace Todo",
+          "icon": "media/icon3.svg"
+        }
+      ]
+    },
+    "views": {
+      "workspace-todo-container": [
+        {
+          "id": "workspace-todo.mainView",
+          "name": "",
+          "type": "webview"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "workspace-todo.clearCompleted",
+        "title": "Workspace Todo: Clear Completed Todos",
+        "category": "Workspace Todo"
+      }
+    ],
+    "configuration": {
+      "title": "Workspace Todo",
+      "properties": {
+        "workspace-todo.hideCompleted": {
+          "type": "boolean",
+          "default": false,
+          "description": "Hide completed todos from the list."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "node esbuild.js",
+    "watch": "node esbuild.js --watch",
+    "package": "npm run build && vsce package --no-dependencies --allow-missing-repository",
+    "vscode:prepublish": "npm run build"
+  },
+  "dependencies": {
+    "@fontsource/jetbrains-mono": "^5.2.8",
+    "marked": "^18.0.3",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "sortablejs": "^1.15.7"
+  },
+  "devDependencies": {
+    "@types/node": "^25.7.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@types/sortablejs": "^1.15.9",
+    "@types/vscode": "^1.120.0",
+    "@vscode/vsce": "^3.9.1",
+    "esbuild": "^0.28.0",
+    "typescript": "^6.0.3"
+  }
+}

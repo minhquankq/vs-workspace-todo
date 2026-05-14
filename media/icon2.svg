@@ -1,0 +1,64 @@
+<svg width="300" height="300" viewBox="0 0 300 300" role="img" xmlns="http://www.w3.org/2000/svg">
+  <title>Workspace Todo VS Code Extension Icon</title>
+  <desc>A rounded square icon with a checklist and markdown-style elements representing a workspace task manager</desc>
+
+  <style>
+    .check-circle { fill: #4ec9b0; }
+    .check-empty { fill: none; stroke: #4a4a6a; stroke-width: 2.5; }
+    .check-mark { stroke: #1e1e2e; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; fill: none; }
+    .md-hash { fill: #569cd6; }
+    .bracket { fill: #ffd700; }
+  </style>
+
+  <!-- Icon background -->
+  <rect width="300" height="300" rx="52" ry="52" fill="#1e1e2e"/>
+  <rect x="2" y="2" width="296" height="296" rx="50" ry="50" fill="none" stroke="#3a3a5a" stroke-width="1.5"/>
+
+  <!-- # markdown symbol -->
+  <rect x="30" y="36" width="6" height="28" rx="3" class="md-hash"/>
+  <rect x="40" y="36" width="6" height="28" rx="3" class="md-hash"/>
+  <rect x="28" y="46" width="26" height="5" rx="2.5" class="md-hash"/>
+  <rect x="28" y="57" width="26" height="5" rx="2.5" class="md-hash"/>
+
+  <!-- Title line -->
+  <rect x="64" y="44" width="90" height="8" rx="4" fill="#569cd6" opacity="0.85"/>
+  <rect x="64" y="57" width="60" height="6" rx="3" fill="#4a4a6a"/>
+
+  <!-- Divider -->
+  <rect x="28" y="82" width="244" height="2" rx="1" fill="#3a3a5a"/>
+
+  <!-- Task 1 — done -->
+  <circle cx="52" cy="115" r="13" class="check-circle"/>
+  <polyline points="45,115 50,121 60,108" class="check-mark"/>
+  <rect x="73" y="108" width="130" height="7" rx="3.5" fill="#4ec9b0" opacity="0.5"/>
+  <line x1="73" y1="111.5" x2="200" y2="111.5" stroke="#4ec9b0" stroke-width="2" opacity="0.6"/>
+  <rect x="73" y="120" width="90" height="5" rx="2.5" fill="#3a3a5a"/>
+
+  <!-- Task 2 — done -->
+  <circle cx="52" cy="163" r="13" class="check-circle"/>
+  <polyline points="45,163 50,169 60,156" class="check-mark"/>
+  <rect x="73" y="156" width="155" height="7" rx="3.5" fill="#4a4a6a"/>
+  <line x1="73" y1="159.5" x2="225" y2="159.5" stroke="#4ec9b0" stroke-width="2" opacity="0.6"/>
+  <rect x="73" y="168" width="75" height="5" rx="2.5" fill="#3a3a5a"/>
+
+  <!-- Task 3 — in progress -->
+  <circle cx="52" cy="211" r="13" fill="none" stroke="#c586c0" stroke-width="2.5"/>
+  <circle cx="52" cy="211" r="6" fill="#c586c0"/>
+  <rect x="73" y="204" width="170" height="7" rx="3.5" fill="#6a4a7a"/>
+  <rect x="73" y="215" width="115" height="5" rx="2.5" fill="#3a3a5a"/>
+
+  <!-- Task 4 — pending -->
+  <circle cx="52" cy="255" r="13" class="check-empty"/>
+  <rect x="73" y="248" width="140" height="7" rx="3.5" fill="#3a3a5a"/>
+  <rect x="73" y="259" width="85" height="5" rx="2.5" fill="#2e2e4e"/>
+
+  <!-- Bracket / markdown code hint -->
+  <rect x="28" y="274" width="14" height="8" rx="2" fill="#ffd700" opacity="0.7"/>
+  <rect x="46" y="274" width="50" height="8" rx="2" fill="#3a3a5a" opacity="0.6"/>
+  <rect x="101" y="274" width="14" height="8" rx="2" fill="#ffd700" opacity="0.7"/>
+
+  <!-- Accent dots -->
+  <circle cx="240" cy="115" r="4" fill="#4ec9b0" opacity="0.4"/>
+  <circle cx="254" cy="163" r="4" fill="#4ec9b0" opacity="0.4"/>
+  <circle cx="252" cy="211" r="4" fill="#c586c0" opacity="0.5"/>
+</svg>
