@@ -2,6 +2,8 @@
 
 A VS Code extension that provides a workspace-scoped todo list with markdown support, accessible from the Activity Bar.
 
+![Demo](media/demo-1.gif)
+
 ## Features
 
 - **Workspace-scoped** — todos are saved per workspace and persist across sessions
@@ -23,48 +25,15 @@ A VS Code extension that provides a workspace-scoped todo list with markdown sup
 
 ## Commands
 
-| Command | Description |
-|---|---|
+| Command                                 | Description                 |
+| --------------------------------------- | --------------------------- |
 | `Workspace Todo: Clear Completed Todos` | Removes all completed todos |
 
 ## Settings
 
-| Setting | Default | Description |
-|---|---|---|
+| Setting                        | Default | Description                        |
+| ------------------------------ | ------- | ---------------------------------- |
 | `workspace-todo.hideCompleted` | `false` | Hide completed todos from the list |
-
-## Development
-
-### Prerequisites
-
-- Node.js
-- npm
-
-### Install dependencies
-
-```bash
-npm install
-```
-
-### Build
-
-```bash
-npm run build
-```
-
-### Watch mode
-
-```bash
-npm run watch
-```
-
-### Package
-
-```bash
-npm run package
-```
-
-This produces a `.vsix` file that can be installed via **Extensions: Install from VSIX** in VS Code.
 
 ## Tech Stack
 
