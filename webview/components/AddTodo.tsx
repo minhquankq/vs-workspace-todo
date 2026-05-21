@@ -1,4 +1,5 @@
 import React, { useRef, useState } from "react";
+import { useMarkdownShortcuts } from "../hooks/useMarkdownShortcuts";
 
 interface Props {
   onAdd: (content: string) => void;
@@ -9,8 +10,10 @@ const isMac = /mac/i.test(navigator.platform);
 export default function AddTodo({ onAdd }: Props) {
   const [value, setValue] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const { handleShortcut } = useMarkdownShortcuts(value, setValue, textareaRef);
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (handleShortcut(e)) return;
     if (e.key === "Enter" && (e.metaKey || e.altKey)) {
       e.preventDefault();
       submit();

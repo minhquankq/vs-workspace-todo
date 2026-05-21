@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { marked } from "marked";
 import { TodoItem } from "../../src/types";
+import { useMarkdownShortcuts } from "../hooks/useMarkdownShortcuts";
 
 marked.setOptions({ breaks: true });
 
@@ -14,6 +15,7 @@ export default function TodoItemView({ todo, onUpdate, onDelete }: Props) {
   const [editing, setEditing] = useState(false);
   const [editValue, setEditValue] = useState(todo.content);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const { handleShortcut } = useMarkdownShortcuts(editValue, setEditValue, textareaRef);
 
   useEffect(() => {
     if (editing) {
@@ -44,6 +46,7 @@ export default function TodoItemView({ todo, onUpdate, onDelete }: Props) {
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (handleShortcut(e)) return;
     if (e.key === "Enter" && (e.metaKey || e.altKey)) {
       e.preventDefault();
       handleSave();

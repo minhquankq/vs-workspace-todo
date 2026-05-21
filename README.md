@@ -23,6 +23,18 @@ A VS Code extension that provides a workspace-scoped todo list with markdown sup
 5. Use the search bar to filter todos by content.
 6. Use the toolbar menu (⋮) to hide completed todos or clear them all.
 
+## Keyboard Shortcuts
+
+These shortcuts work in both the **add** input and the **edit** textarea. Select text first to format a selection, or press the shortcut with no selection to insert markers with the cursor placed between them.
+
+| Shortcut | Mac | Effect |
+| -------- | --- | ------ |
+| `Ctrl+B` | `⌘B` | **Bold** — wraps with `**...**` |
+| `Ctrl+I` | `⌘I` | *Italic* — wraps with `*...*` |
+| `Ctrl+U` | `⌘U` | Underline — wraps with `<u>...</u>` |
+| `Alt+↵` | `⌘↵` | Submit / save the todo |
+| `Escape` | `Escape` | Cancel editing |
+
 ## Commands
 
 | Command                                 | Description                 |

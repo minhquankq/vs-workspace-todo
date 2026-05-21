@@ -293,6 +293,19 @@ body {
   padding: 6px 8px;
 }
 
+.todo-item__content h1,
+.todo-item__content h2,
+.todo-item__content h3,
+.todo-item__content h4,
+.todo-item__content h5,
+.todo-item__content h6 {
+  font-size: calc(var(--vscode-font-size, 13px) + 2px);
+  font-weight: 600;
+  text-transform: capitalize;
+  margin: 0 0 2px;
+  line-height: inherit;
+}
+
 .todo-item__content strong {
   font-weight: 600;
 }
