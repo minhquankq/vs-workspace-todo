@@ -291,6 +291,7 @@ body {
 .todo-item__content pre code {
   display: block;
   padding: 6px 8px;
+  overflow: auto;
 }
 
 .todo-item__content h1,
