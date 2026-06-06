@@ -1,24 +1,45 @@
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import { useMarkdownShortcuts } from "../hooks/useMarkdownShortcuts";
+import Icon from "./Icon";
 
 interface Props {
   onAdd: (content: string) => void;
 }
 
-const isMac = /mac/i.test(navigator.platform);
+const isMac = typeof navigator !== "undefined" && /mac/i.test(navigator.platform);
+
+function wrapSelection(
+  ta: HTMLTextAreaElement,
+  value: string,
+  setValue: (v: string) => void,
+  before: string,
+  after: string = before
+) {
+  const s = ta.selectionStart;
+  const e = ta.selectionEnd;
+  const sel = value.slice(s, e);
+  const next = value.slice(0, s) + before + sel + after + value.slice(e);
+  setValue(next);
+  requestAnimationFrame(() => {
+    ta.focus();
+    ta.selectionStart = s + before.length;
+    ta.selectionEnd = e + before.length;
+  });
+}
 
 export default function AddTodo({ onAdd }: Props) {
   const [value, setValue] = useState("");
+  const [focus, setFocus] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { handleShortcut } = useMarkdownShortcuts(value, setValue, textareaRef);
 
-  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
-    if (handleShortcut(e)) return;
-    if (e.key === "Enter" && (e.metaKey || e.altKey)) {
-      e.preventDefault();
-      submit();
-    }
-  }
+  // Auto-resize textarea
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = Math.min(el.scrollHeight, 160) + "px";
+  }, [value]);
 
   function submit() {
     const trimmed = value.trim();
@@ -28,31 +49,53 @@ export default function AddTodo({ onAdd }: Props) {
     textareaRef.current?.focus();
   }
 
+  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (handleShortcut(e)) return;
+    if (e.key === "Enter" && (e.metaKey || e.altKey)) {
+      e.preventDefault();
+      submit();
+    }
+  }
+
+  function handleFormat(e: React.MouseEvent, before: string, after: string = before) {
+    e.preventDefault();
+    if (textareaRef.current) {
+      wrapSelection(textareaRef.current, value, setValue, before, after);
+    }
+  }
+
   return (
-    <div className="add-todo">
-      <div className="add-todo__card">
-        <textarea
-          ref={textareaRef}
-          className="add-todo__textarea"
-          placeholder="Add a todo… markdown supported ✨"
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          onKeyDown={handleKeyDown}
-          rows={3}
-        />
-        <div className="add-todo__footer">
-          <span className="add-todo__hint">{isMac ? "⌘↵" : "Alt↵"} to add</span>
-          <button
-            className="add-todo__btn"
-            onClick={submit}
-            disabled={!value.trim()}
-            title="Add todo"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-              <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
-            </svg>
-          </button>
-        </div>
+    <div className={"addbar" + (focus ? " focus" : "")}>
+      <div className="add-tools">
+        <button onMouseDown={(e) => handleFormat(e, "**")} title="Bold (⌘B)">
+          <Icon name="bold" size={14} />
+        </button>
+        <button onMouseDown={(e) => handleFormat(e, "*")} title="Italic (⌘I)">
+          <Icon name="italic" size={14} />
+        </button>
+        <button onMouseDown={(e) => handleFormat(e, "`")} title="Code">
+          <Icon name="code" size={14} />
+        </button>
+      </div>
+      <textarea
+        ref={textareaRef}
+        rows={1}
+        placeholder="Add a todo…  markdown supported"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onKeyDown={handleKeyDown}
+        onFocus={() => setFocus(true)}
+        onBlur={() => setFocus(false)}
+      />
+      <div className="add-foot">
+        <span className="hint">{isMac ? "⌘↵" : "Alt↵"} to add</span>
+        <button
+          className={"send" + (value.trim() ? " on" : "")}
+          onClick={submit}
+          title="Add todo"
+        >
+          <Icon name="send" size={15} />
+        </button>
       </div>
     </div>
   );

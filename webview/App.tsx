@@ -1,10 +1,12 @@
-import React, { useReducer, useMemo, useEffect } from "react";
+import React, { useReducer, useMemo, useEffect, useState } from "react";
 import { TodoItem, Settings, SyncUser } from "../src/types";
 import { useVsCode } from "./hooks/useVsCode";
 import SearchBar from "./components/SearchBar";
 import Toolbar from "./components/Toolbar";
 import TodoList from "./components/TodoList";
 import AddTodo from "./components/AddTodo";
+import EditDialog from "./components/EditDialog";
+import Icon from "./components/Icon";
 
 interface State {
   todos: TodoItem[];
@@ -40,12 +42,12 @@ export default function App() {
     search: "",
     user: null,
   });
+  const [editingTodo, setEditingTodo] = useState<TodoItem | null>(null);
 
   const { send, syncStatus, syncError } = useVsCode((todos, settings, user) => {
     dispatch({ type: "SET_STATE", todos, settings, user });
   });
 
-  // Tell extension we're ready so it can push initial state
   useEffect(() => {
     send({ type: "ready" });
   }, [send]);
@@ -58,40 +60,79 @@ export default function App() {
     return sorted.filter((t) => t.content.toLowerCase().includes(q));
   }, [state.todos, state.search, state.settings.hideCompleted]);
 
+  const remaining = state.todos.filter((t) => !t.completed).length;
+  const doneCount = state.todos.length - remaining;
+
+  const showStrip = state.user !== null && syncStatus !== "idle";
+  const stripStateClass =
+    syncStatus === "synced" ? "ok" :
+    syncStatus === "syncing" ? "go" :
+    syncStatus === "offline" ? "warn" : "";
+  const stripLabel =
+    syncStatus === "synced"  ? "All changes synced" :
+    syncStatus === "syncing" ? "Syncing…" :
+    syncStatus === "offline" ? "Offline — will retry" :
+    "Sync error";
+
   return (
-    <div className="app">
-      <div className="search-row">
-        <SearchBar
-          value={state.search}
-          onChange={(s) => dispatch({ type: "SET_SEARCH", search: s })}
-        />
-        <Toolbar
-          settings={state.settings}
-          user={state.user}
-          syncStatus={syncStatus}
-          syncError={syncError}
-          onClearCompleted={() => send({ type: "clearCompleted" })}
-          onToggleHideCompleted={() =>
-            send({
-              type: "updateSettings",
-              settings: { hideCompleted: !state.settings.hideCompleted },
-            })
-          }
-          onSignIn={() => send({ type: "signIn" })}
-          onSignOut={() => send({ type: "signOut" })}
-        />
-      </div>
-      <div className="todo-section">
+    <div className="panel d-regular">
+      <Toolbar
+        settings={state.settings}
+        user={state.user}
+        syncStatus={syncStatus}
+        syncError={syncError}
+        onClearCompleted={() => send({ type: "clearCompleted" })}
+        onToggleHideCompleted={() =>
+          send({
+            type: "updateSettings",
+            settings: { hideCompleted: !state.settings.hideCompleted },
+          })
+        }
+        onSignIn={() => send({ type: "signIn" })}
+        onSignOut={() => send({ type: "signOut" })}
+      />
+
+      <SearchBar
+        value={state.search}
+        onChange={(s) => dispatch({ type: "SET_SEARCH", search: s })}
+      />
+
+      {showStrip && (
+        <div className="p-strip">
+          <Icon name="folder" size={13} />
+          <span className="strip-name">{state.user?.name ?? state.user?.email}</span>
+          <span className={"strip-dot " + stripStateClass} />
+          <span className="strip-state">{stripLabel}</span>
+        </div>
+      )}
+
+      <div className="p-list">
         <TodoList
           todos={filteredTodos}
+          search={state.search}
           onUpdate={(id, content, completed) =>
             send({ type: "updateTodo", id, content, completed })
           }
+          onEdit={setEditingTodo}
           onDelete={(id) => send({ type: "deleteTodo", id })}
           onReorder={(ids) => send({ type: "reorderTodos", ids })}
         />
       </div>
+
+      <div className="p-count">{remaining} active · {doneCount} done</div>
+
       <AddTodo onAdd={(content) => send({ type: "addTodo", content })} />
+
+      {editingTodo && (
+        <EditDialog
+          todo={editingTodo}
+          onClose={() => setEditingTodo(null)}
+          onSave={(content) => {
+            send({ type: "updateTodo", id: editingTodo.id, content });
+            setEditingTodo(null);
+          }}
+        />
+      )}
     </div>
   );
 }

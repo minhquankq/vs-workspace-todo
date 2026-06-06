@@ -1,4 +1,5 @@
 import React from "react";
+import Icon from "./Icon";
 
 interface Props {
   value: string;
@@ -7,22 +8,19 @@ interface Props {
 
 export default function SearchBar({ value, onChange }: Props) {
   return (
-    <div className="search-bar">
-      <span className="search-bar__icon">⌕</span>
+    <div className="p-search">
+      <span className="s-ic">
+        <Icon name="search" size={14} />
+      </span>
       <input
         type="text"
-        className="search-bar__input"
         placeholder="Search todos…"
         value={value}
         onChange={(e) => onChange(e.target.value)}
       />
       {value && (
-        <button
-          className="search-bar__clear"
-          onClick={() => onChange("")}
-          title="Clear search"
-        >
-          ×
+        <button className="s-clear" onClick={() => onChange("")} title="Clear">
+          <Icon name="close" size={12} />
         </button>
       )}
     </div>

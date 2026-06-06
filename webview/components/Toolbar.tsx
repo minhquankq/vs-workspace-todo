@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Settings, SyncUser } from "../../src/types";
 import { SyncStatus } from "../hooks/useVsCode";
+import Icon from "./Icon";
 
 interface Props {
   settings: Settings;
@@ -13,21 +14,13 @@ interface Props {
   onSignOut: () => void;
 }
 
-function SyncIcon({ status }: { status: SyncStatus }) {
-  if (status === "syncing") {
-    return <span className="toolbar__sync-icon toolbar__sync-icon--spinning" title="Syncing…">↻</span>;
-  }
-  if (status === "synced") {
-    return <span className="toolbar__sync-icon toolbar__sync-icon--synced" title="Synced">✓</span>;
-  }
-  if (status === "offline") {
-    return <span className="toolbar__sync-icon toolbar__sync-icon--offline" title="Offline">⊘</span>;
-  }
-  if (status === "error") {
-    return <span className="toolbar__sync-icon toolbar__sync-icon--error" title="Sync error">!</span>;
-  }
-  return null;
-}
+const SYNC_STATE: Record<SyncStatus, { icon: "cloud" | "sync" | "cloud-check" | "cloud-off" | "warn"; cls: string; label: string }> = {
+  idle:    { icon: "cloud",        cls: "off",     label: "Sync off" },
+  syncing: { icon: "sync",         cls: "syncing", label: "Syncing…" },
+  synced:  { icon: "cloud-check",  cls: "ok",      label: "Synced" },
+  offline: { icon: "cloud-off",    cls: "warn",    label: "Offline" },
+  error:   { icon: "warn",         cls: "err",     label: "Sync error" },
+};
 
 export default function Toolbar({
   settings,
@@ -39,85 +32,106 @@ export default function Toolbar({
   onSignIn,
   onSignOut,
 }: Props) {
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [menu, setMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!menuOpen) return;
+    if (!menu) return;
     function handleClick(e: MouseEvent) {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpen(false);
+        setMenu(false);
       }
     }
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
-  }, [menuOpen]);
+  }, [menu]);
+
+  const sync = SYNC_STATE[syncStatus];
 
   return (
-    <div className="toolbar">
-      {(syncStatus === "syncing" || syncStatus === "synced" || syncStatus === "offline" || syncStatus === "error") && (
-        <SyncIcon status={syncStatus} />
-      )}
-      <div className="toolbar__actions" ref={menuRef}>
+    <div className="p-head">
+      <div className="p-title">
+        <Icon name="chevron" size={14} className="caret" />
+        <span>WORKSPACE TODO</span>
+      </div>
+      <div className="p-actions">
         <button
-          className="toolbar__btn"
-          title="More options"
-          onClick={() => setMenuOpen((o) => !o)}
+          className={"sync-badge " + sync.cls}
+          title={sync.label + (syncError ? ": " + syncError : "")}
+          onClick={user ? undefined : onSignIn}
         >
-          ···
+          <Icon name={sync.icon} size={15} />
         </button>
-        {menuOpen && (
-          <div className="toolbar__menu">
-            <button
-              className="toolbar__menu-item"
-              onClick={() => {
-                onClearCompleted();
-                setMenuOpen(false);
-              }}
-              style={{ paddingLeft: 28 }}
-            >
-              Clear completed
-            </button>
-            <button
-              className="toolbar__menu-item"
-              onClick={() => {
-                onToggleHideCompleted();
-                setMenuOpen(false);
-              }}
-              style={{ paddingLeft: !settings.hideCompleted ? 28 : undefined }}
-            >
-              {settings.hideCompleted ? "✓ " : ""} Hide completed
-            </button>
-            <div className="toolbar__menu-divider" />
-            {user ? (
-              <>
-                <div className="toolbar__menu-user">{user.email}</div>
+
+        <div className="menu-wrap" ref={menuRef}>
+          <button
+            className={"hbtn" + (menu ? " active" : "")}
+            title="More actions"
+            onClick={() => setMenu((m) => !m)}
+          >
+            <Icon name="more" size={16} />
+          </button>
+
+          {menu && (
+            <>
+              <div className="menu-scrim" onClick={() => setMenu(false)} />
+              <div className="menu">
+                {user ? (
+                  <div className="menu-acct">
+                    <div className="ava">
+                      {(user.name ?? user.email).charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                      <div className="acct-name">{user.name ?? user.email}</div>
+                      <div className="acct-sub">{user.email}</div>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    className="mi"
+                    onClick={() => { setMenu(false); onSignIn(); }}
+                  >
+                    <Icon name="cloud" size={15} />
+                    <span>Sign in to sync</span>
+                  </button>
+                )}
+
+                <div className="menu-sep" />
+
                 <button
-                  className="toolbar__menu-item"
-                  onClick={() => {
-                    onSignOut();
-                    setMenuOpen(false);
-                  }}
-                  style={{ paddingLeft: 28 }}
+                  className="mi"
+                  onClick={() => { onToggleHideCompleted(); setMenu(false); }}
                 >
-                  Sign out
-                  {syncError && <span className="toolbar__menu-error"> ({syncError})</span>}
+                  <span className="mi-check">
+                    {settings.hideCompleted && <Icon name="check" size={13} />}
+                  </span>
+                  <span>Hide completed</span>
                 </button>
-              </>
-            ) : (
-              <button
-                className="toolbar__menu-item"
-                onClick={() => {
-                  onSignIn();
-                  setMenuOpen(false);
-                }}
-                style={{ paddingLeft: 28 }}
-              >
-                Sign in to sync
-              </button>
-            )}
-          </div>
-        )}
+
+                <button
+                  className="mi"
+                  onClick={() => { onClearCompleted(); setMenu(false); }}
+                >
+                  <Icon name="trash" size={15} />
+                  <span>Clear completed</span>
+                </button>
+
+                {user && (
+                  <>
+                    <div className="menu-sep" />
+                    <button
+                      className="mi"
+                      onClick={() => { setMenu(false); onSignOut(); }}
+                    >
+                      <Icon name="close" size={15} />
+                      <span>Sign out</span>
+                    </button>
+                  </>
+                )}
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
