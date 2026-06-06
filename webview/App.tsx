@@ -1,5 +1,5 @@
 import React, { useReducer, useMemo, useEffect } from "react";
-import { TodoItem, Settings } from "../src/types";
+import { TodoItem, Settings, SyncUser } from "../src/types";
 import { useVsCode } from "./hooks/useVsCode";
 import SearchBar from "./components/SearchBar";
 import Toolbar from "./components/Toolbar";
@@ -10,16 +10,22 @@ interface State {
   todos: TodoItem[];
   settings: Settings;
   search: string;
+  user: SyncUser | null;
 }
 
 type Action =
-  | { type: "SET_STATE"; todos: TodoItem[]; settings: Settings }
+  | { type: "SET_STATE"; todos: TodoItem[]; settings: Settings; user?: SyncUser | null }
   | { type: "SET_SEARCH"; search: string };
 
 function reducer(state: State, action: Action): State {
   switch (action.type) {
     case "SET_STATE":
-      return { ...state, todos: action.todos, settings: action.settings };
+      return {
+        ...state,
+        todos: action.todos,
+        settings: action.settings,
+        user: action.user ?? null,
+      };
     case "SET_SEARCH":
       return { ...state, search: action.search };
     default:
@@ -32,10 +38,11 @@ export default function App() {
     todos: [],
     settings: { hideCompleted: false },
     search: "",
+    user: null,
   });
 
-  const { send } = useVsCode((todos, settings) => {
-    dispatch({ type: "SET_STATE", todos, settings });
+  const { send, syncStatus, syncError } = useVsCode((todos, settings, user) => {
+    dispatch({ type: "SET_STATE", todos, settings, user });
   });
 
   // Tell extension we're ready so it can push initial state
@@ -60,6 +67,9 @@ export default function App() {
         />
         <Toolbar
           settings={state.settings}
+          user={state.user}
+          syncStatus={syncStatus}
+          syncError={syncError}
           onClearCompleted={() => send({ type: "clearCompleted" })}
           onToggleHideCompleted={() =>
             send({
@@ -67,6 +77,8 @@ export default function App() {
               settings: { hideCompleted: !state.settings.hideCompleted },
             })
           }
+          onSignIn={() => send({ type: "signIn" })}
+          onSignOut={() => send({ type: "signOut" })}
         />
       </div>
       <div className="todo-section">

@@ -2,7 +2,7 @@
   "name": "vs-workspace-todo",
   "displayName": "Workspace Todo",
   "description": "Workspace-scoped todo list with markdown support",
-  "version": "1.0.3",
+  "version": "2.0.0",
   "publisher": "quan-vo",
   "icon": "media/icon.png",
   "repository": {
@@ -15,7 +15,9 @@
   "categories": [
     "Other"
   ],
-  "activationEvents": [],
+  "activationEvents": [
+    "onUri"
+  ],
   "main": "./dist/extension.js",
   "contributes": {
     "viewsContainers": {
@@ -41,6 +43,21 @@
         "command": "workspace-todo.clearCompleted",
         "title": "Workspace Todo: Clear Completed Todos",
         "category": "Workspace Todo"
+      },
+      {
+        "command": "workspace-todo.signIn",
+        "title": "Workspace Todo: Sign In",
+        "category": "Workspace Todo"
+      },
+      {
+        "command": "workspace-todo.signOut",
+        "title": "Workspace Todo: Sign Out",
+        "category": "Workspace Todo"
+      },
+      {
+        "command": "workspace-todo.syncNow",
+        "title": "Workspace Todo: Sync Now",
+        "category": "Workspace Todo"
       }
     ],
     "configuration": {
@@ -50,6 +67,16 @@
           "type": "boolean",
           "default": false,
           "description": "Hide completed todos from the list."
+        },
+         "workspace-todo.apiBaseUrl": {
+          "type": "string",
+          "default": "https://vs-todo.quans.pro",
+          "description": "API base URL for cloud sync."
+        },
+        "workspace-todo.googleClientId": {
+          "type": "string",
+          "default": "793838283410-8os6cnu0naek30k2vgn3o988fhnakq5f.apps.googleusercontent.com",
+          "description": "Google OAuth 2.0 Client ID for cloud sync sign-in."
         }
       }
     }

@@ -3,9 +3,16 @@ import { TodoItem, Settings } from "./types";
 
 const TODOS_KEY = "workspace-todo.todos";
 const SETTINGS_KEY = "workspace-todo.settings";
+const LAST_SYNCED_AT_KEY = "workspace-todo.lastSyncedAt";
+const SYNCED_WORKSPACE_NAME_KEY = "workspace-todo.syncedWorkspaceName";
 
 export function getTodos(state: vscode.Memento): TodoItem[] {
-  return state.get<TodoItem[]>(TODOS_KEY, []);
+  const raw = state.get<TodoItem[]>(TODOS_KEY, []);
+  // Backfill updatedAt for todos created before sync was added
+  return raw.map((t) => ({
+    ...t,
+    updatedAt: t.updatedAt ?? t.createdAt,
+  }));
 }
 
 export async function saveTodos(
@@ -26,4 +33,26 @@ export async function saveSettings(
   settings: Settings
 ): Promise<void> {
   await state.update(SETTINGS_KEY, settings);
+}
+
+export function getLastSyncedAt(state: vscode.Memento): number | undefined {
+  return state.get<number>(LAST_SYNCED_AT_KEY);
+}
+
+export async function saveLastSyncedAt(
+  state: vscode.Memento,
+  ts: number
+): Promise<void> {
+  await state.update(LAST_SYNCED_AT_KEY, ts);
+}
+
+export function getSyncedWorkspaceName(state: vscode.Memento): string | undefined {
+  return state.get<string>(SYNCED_WORKSPACE_NAME_KEY);
+}
+
+export async function saveSyncedWorkspaceName(
+  state: vscode.Memento,
+  name: string
+): Promise<void> {
+  await state.update(SYNCED_WORKSPACE_NAME_KEY, name);
 }

@@ -1,5 +1,5 @@
-import { TodoItem, Settings, WebviewMessage, ExtensionMessage } from "../../src/types";
-import { useEffect, useRef, useCallback } from "react";
+import { TodoItem, Settings, WebviewMessage, ExtensionMessage, SyncUser } from "../../src/types";
+import { useEffect, useRef, useCallback, useState } from "react";
 
 // Acquire the VS Code API once and cache it
 declare function acquireVsCodeApi(): {
@@ -16,17 +16,25 @@ function getVsCodeApi() {
   return vscodeApi;
 }
 
+export type SyncStatus = "idle" | "syncing" | "synced" | "offline" | "error";
+
 export function useVsCode(
-  onState: (todos: TodoItem[], settings: Settings) => void
+  onState: (todos: TodoItem[], settings: Settings, user?: SyncUser | null) => void
 ) {
   const onStateRef = useRef(onState);
   onStateRef.current = onState;
+
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>("idle");
+  const [syncError, setSyncError] = useState<string | undefined>();
 
   useEffect(() => {
     const handler = (event: MessageEvent) => {
       const msg = event.data as ExtensionMessage;
       if (msg.type === "setState") {
-        onStateRef.current(msg.todos, msg.settings);
+        onStateRef.current(msg.todos, msg.settings, msg.user);
+      } else if (msg.type === "syncStatus") {
+        setSyncStatus(msg.status);
+        setSyncError(msg.error);
       }
     };
     window.addEventListener("message", handler);
@@ -37,5 +45,5 @@ export function useVsCode(
     getVsCodeApi().postMessage(message);
   }, []);
 
-  return { send };
+  return { send, syncStatus, syncError };
 }

@@ -3,13 +3,39 @@ import * as path from "path";
 import * as crypto from "crypto";
 import { getTodos, saveTodos, getSettings, saveSettings } from "./storage";
 import { TodoItem, Settings, WebviewMessage, ExtensionMessage } from "./types";
+import { AuthService } from "./auth";
+import { ApiClient } from "./api";
+import { SyncService } from "./sync";
 
 export class TodoViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewId = "workspace-todo.mainView";
 
   private _view?: vscode.WebviewView;
+  private _syncService?: SyncService;
 
-  constructor(private readonly _context: vscode.ExtensionContext) {}
+  constructor(
+    private readonly _context: vscode.ExtensionContext,
+    private readonly _authService: AuthService,
+    private readonly _apiClient: ApiClient
+  ) {}
+
+  public async initSync(): Promise<void> {
+    const signedIn = await this._authService.isSignedIn(this._context);
+    if (!signedIn) return;
+
+    this._syncService = new SyncService(
+      this._apiClient,
+      this._context,
+      () => this._pushState(),
+      (status, error) => this._emitSyncStatus(status, error)
+    );
+    this._syncService.startPeriodicSync();
+  }
+
+  public async stopSync(): Promise<void> {
+    this._syncService?.stopPeriodicSync();
+    this._syncService = undefined;
+  }
 
   public resolveWebviewView(
     webviewView: vscode.WebviewView,
@@ -31,7 +57,8 @@ export class TodoViewProvider implements vscode.WebviewViewProvider {
       async (message: WebviewMessage) => {
         switch (message.type) {
           case "ready":
-            this._pushState();
+            await this._pushState();
+            this._syncService?.pull();
             break;
           case "addTodo":
             await this._handleAddTodo(message.content);
@@ -55,6 +82,12 @@ export class TodoViewProvider implements vscode.WebviewViewProvider {
           case "clearCompleted":
             await this._handleClearCompleted();
             break;
+          case "signIn":
+            await this._handleSignIn();
+            break;
+          case "signOut":
+            await this._handleSignOut();
+            break;
         }
       },
       undefined,
@@ -66,18 +99,38 @@ export class TodoViewProvider implements vscode.WebviewViewProvider {
     await this._handleClearCompleted();
   }
 
+  private async _handleSignIn(): Promise<void> {
+    try {
+      await this._authService.signIn(this._context, this._apiClient.baseUrl);
+      await this.initSync();
+      await this._pushState();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      vscode.window.showErrorMessage(`Sign in failed: ${msg}`);
+    }
+  }
+
+  private async _handleSignOut(): Promise<void> {
+    await this.stopSync();
+    await this._authService.signOut(this._context);
+    await this._pushState();
+  }
+
   private async _handleAddTodo(content: string): Promise<void> {
     const todos = getTodos(this._context.workspaceState);
     const maxOrder = todos.reduce((m, t) => Math.max(m, t.order), -1);
+    const now = Date.now();
     const newTodo: TodoItem = {
       id: crypto.randomUUID(),
       content: content.trim(),
       completed: false,
-      createdAt: Date.now(),
+      createdAt: now,
       order: maxOrder + 1,
+      updatedAt: now,
     };
     await saveTodos(this._context.workspaceState, [...todos, newTodo]);
     this._pushState();
+    this._syncService?.push();
   }
 
   private async _handleUpdateTodo(
@@ -85,8 +138,8 @@ export class TodoViewProvider implements vscode.WebviewViewProvider {
     content?: string,
     completed?: boolean
   ): Promise<void> {
+    const now = Date.now();
     let todos = getTodos(this._context.workspaceState);
-    const settings = getSettings(this._context.workspaceState);
 
     todos = todos.map((t) => {
       if (t.id !== id) return t;
@@ -94,32 +147,42 @@ export class TodoViewProvider implements vscode.WebviewViewProvider {
         ...t,
         ...(content !== undefined ? { content } : {}),
         ...(completed !== undefined ? { completed } : {}),
+        updatedAt: now,
       };
     });
 
     await saveTodos(this._context.workspaceState, todos);
     this._pushState();
+    this._syncService?.push();
   }
 
   private async _handleDeleteTodo(id: string): Promise<void> {
-    const todos = getTodos(this._context.workspaceState).filter(
-      (t) => t.id !== id
+    const now = Date.now();
+    const todos = getTodos(this._context.workspaceState).map((t) =>
+      t.id === id ? { ...t, deletedAt: now, updatedAt: now } : t
     );
     await saveTodos(this._context.workspaceState, todos);
     this._pushState();
+    this._syncService?.push();
   }
 
   private async _handleReorderTodos(ids: string[]): Promise<void> {
+    const now = Date.now();
     const todos = getTodos(this._context.workspaceState);
     const map = new Map(todos.map((t) => [t.id, t]));
     const reordered = ids
       .map((id, index) => {
         const t = map.get(id);
-        return t ? { ...t, order: index } : null;
+        return t ? { ...t, order: index, updatedAt: now } : null;
       })
       .filter((t): t is TodoItem => t !== null);
-    await saveTodos(this._context.workspaceState, reordered);
+
+    // Preserve any todos not in the reorder list (e.g., soft-deleted)
+    const reorderedIds = new Set(ids);
+    const rest = todos.filter((t) => !reorderedIds.has(t.id));
+    await saveTodos(this._context.workspaceState, [...reordered, ...rest]);
     this._pushState();
+    this._syncService?.push();
   }
 
   private async _handleUpdateSettings(
@@ -129,21 +192,36 @@ export class TodoViewProvider implements vscode.WebviewViewProvider {
     const updated: Settings = { ...current, ...partial };
     await saveSettings(this._context.workspaceState, updated);
     this._pushState();
+    this._syncService?.push();
   }
 
   private async _handleClearCompleted(): Promise<void> {
-    const todos = getTodos(this._context.workspaceState).filter(
-      (t) => !t.completed
+    const now = Date.now();
+    const todos = getTodos(this._context.workspaceState).map((t) =>
+      t.completed && !t.deletedAt ? { ...t, deletedAt: now, updatedAt: now } : t
     );
     await saveTodos(this._context.workspaceState, todos);
     this._pushState();
+    this._syncService?.push();
   }
 
-  private _pushState(): void {
+  private async _pushState(): Promise<void> {
     if (!this._view) return;
-    const todos = getTodos(this._context.workspaceState);
+    const allTodos = getTodos(this._context.workspaceState);
+    // Filter out soft-deleted todos for the webview
+    const todos = allTodos.filter((t) => !t.deletedAt);
     const settings = getSettings(this._context.workspaceState);
-    const msg: ExtensionMessage = { type: "setState", todos, settings };
+    const user = await this._authService.getUser(this._context);
+    const msg: ExtensionMessage = { type: "setState", todos, settings, user };
+    this._view.webview.postMessage(msg);
+  }
+
+  private _emitSyncStatus(
+    status: "syncing" | "synced" | "offline" | "error",
+    error?: string
+  ): void {
+    if (!this._view) return;
+    const msg: ExtensionMessage = { type: "syncStatus", status, error };
     this._view.webview.postMessage(msg);
   }
 
