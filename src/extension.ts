@@ -20,9 +20,11 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.window.registerUriHandler({
       handleUri(uri: vscode.Uri) {
         if (uri.path === "/auth/callback") {
-          const code = new URLSearchParams(uri.query).get("code");
-          if (code) {
-            authService.handleOAuthCallback(code);
+          const params = new URLSearchParams(uri.query);
+          const code = params.get("code");
+          const state = params.get("state");
+          if (code && state) {
+            authService.handleOAuthCallback(code, state);
           }
         }
       },

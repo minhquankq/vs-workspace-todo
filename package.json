@@ -70,13 +70,8 @@
         },
          "workspace-todo.apiBaseUrl": {
           "type": "string",
-          "default": "https://vs-todo.quans.pro",
+          "default": "http://localhost:3000",
           "description": "API base URL for cloud sync."
-        },
-        "workspace-todo.googleClientId": {
-          "type": "string",
-          "default": "793838283410-8os6cnu0naek30k2vgn3o988fhnakq5f.apps.googleusercontent.com",
-          "description": "Google OAuth 2.0 Client ID for cloud sync sign-in."
         }
       }
     }
