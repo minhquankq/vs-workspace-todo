@@ -73,6 +73,12 @@ export default function AddTodo({ onAdd }: Props) {
         <button onMouseDown={(e) => handleFormat(e, "*")} title="Italic (⌘I)">
           <Icon name="italic" size={14} />
         </button>
+        <button onMouseDown={(e) => handleFormat(e, "<u>", "</u>")} title="Underline (⌘U)">
+          <Icon name="underline" size={14} />
+        </button>
+        <button onMouseDown={(e) => handleFormat(e, "~~")} title="Strikethrough">
+          <Icon name="strikethrough" size={14} />
+        </button>
         <button onMouseDown={(e) => handleFormat(e, "`")} title="Code">
           <Icon name="code" size={14} />
         </button>

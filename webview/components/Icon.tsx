@@ -3,7 +3,7 @@ import React from "react";
 export type IconName =
   | "search" | "more" | "plus" | "send" | "grip" | "check"
   | "chevron" | "close" | "cloud" | "cloud-check" | "cloud-off"
-  | "sync" | "folder" | "warn" | "trash" | "bold" | "italic" | "code";
+  | "sync" | "folder" | "warn" | "trash" | "bold" | "italic" | "underline" | "strikethrough" | "code";
 
 interface Props {
   name: IconName;
@@ -60,6 +60,10 @@ export default function Icon({ name, size = 16, className, style }: Props) {
       return <svg {...base} strokeWidth={1.5}><path d="M5 3.5h3.2a2.2 2.2 0 0 1 0 4.4H5zM5 7.9h3.8a2.3 2.3 0 0 1 0 4.6H5z" /></svg>;
     case "italic":
       return <svg {...base} strokeWidth={1.5}><path d="M6.5 3.5h4M5 12.5h4M9.5 3.5 7 12.5" /></svg>;
+    case "underline":
+      return <svg {...base} strokeWidth={1.5}><path d="M5 3.5v5a3 3 0 0 0 6 0v-5" /><path d="M4 12.5h8" /></svg>;
+    case "strikethrough":
+      return <svg {...base} strokeWidth={1.5}><path d="M10.5 4.5a2 2 0 0 0-2-1h-1a2 2 0 0 0 0 4h1a2 2 0 0 1 0 4h-1a2 2 0 0 1-2-1" /><path d="M4 8h8" /></svg>;
     case "code":
       return <svg {...base}><path d="M6 5 3 8l3 3M10 5l3 3-3 3" /></svg>;
     default:
