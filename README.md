@@ -5,6 +5,8 @@ A VS Code extension that provides a workspace-scoped todo list with markdown sup
 [![VS Code Marketplace](https://img.shields.io/visual-studio-marketplace/v/quan-vo.vs-workspace-todo?label=VS%20Code%20Marketplace)](https://marketplace.visualstudio.com/items?itemName=quan-vo.vs-workspace-todo)
 [![GitHub](https://img.shields.io/github/license/minhquankq/vs-workspace-todo)](LICENSE)
 
+Website: [https://vs-todo.quans.pro](https://vs-todo.quans.pro)
+
 ![Demo](media/demo-1.gif)
 
 ## Features
