@@ -1,14 +1,22 @@
 import * as vscode from "vscode";
 import { ApiClient } from "./api";
-import { getTodos, saveTodos, getSettings, getLastSyncedAt, saveLastSyncedAt, getSyncedWorkspaceName, saveSyncedWorkspaceName } from "./storage";
+import {
+  getTodos,
+  saveTodos,
+  getSettings,
+  getLastSyncedAt,
+  saveLastSyncedAt,
+  getSyncedWorkspaceName,
+  saveSyncedWorkspaceName,
+  getLinkedWorkspaceId,
+  getHasPendingSync,
+  saveHasPendingSync,
+} from "./storage";
 import { TodoItem } from "./types";
 
 type SyncStatus = "syncing" | "synced" | "offline" | "error";
 
 export class SyncService {
-  private _periodicTimer?: ReturnType<typeof setInterval>;
-  private _debounceTimer?: ReturnType<typeof setTimeout>;
-
   constructor(
     private readonly apiClient: ApiClient,
     private readonly context: vscode.ExtensionContext,
@@ -21,12 +29,14 @@ export class SyncService {
   }
 
   private _getWorkspaceName(): string | undefined {
-    // Try stored name first, then fall back to current workspace folder
     const stored = getSyncedWorkspaceName(this._workspaceState);
     if (stored) return stored;
-
     const folder = vscode.workspace.workspaceFolders?.[0];
     return folder?.name;
+  }
+
+  private _getWorkspaceId(): string | undefined {
+    return getLinkedWorkspaceId(this._workspaceState);
   }
 
   async ensureWorkspaceName(): Promise<string | undefined> {
@@ -37,12 +47,7 @@ export class SyncService {
     return name;
   }
 
-  push(): void {
-    clearTimeout(this._debounceTimer);
-    this._debounceTimer = setTimeout(() => this._doPush(), 500);
-  }
-
-  private async _doPush(): Promise<void> {
+  async push(): Promise<void> {
     const workspaceName = await this.ensureWorkspaceName();
     if (!workspaceName) return;
 
@@ -61,6 +66,7 @@ export class SyncService {
 
       await this._mergeServerResponse(response.todos);
       await saveLastSyncedAt(this._workspaceState, response.syncedAt);
+      await saveHasPendingSync(this._workspaceState, false);
       this.onStateChange();
       this.onStatusChange("synced");
     } catch (err: unknown) {
@@ -96,19 +102,71 @@ export class SyncService {
     }
   }
 
-  async fullSync(): Promise<void> {
-    await this._doPush();
+  async syncOnOpen(): Promise<void> {
+    const pending = getHasPendingSync(this._workspaceState);
+    if (pending) {
+      await this.push();
+    } else {
+      await this.pull();
+    }
   }
 
-  startPeriodicSync(): void {
-    this.stopPeriodicSync();
-    this._periodicTimer = setInterval(() => this.pull(), 5 * 60 * 1000);
+  private async _handleCrudError(err: unknown): Promise<void> {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg === "AUTH_EXPIRED") {
+      this.onStatusChange("error", "Session expired. Please sign in again.");
+    } else {
+      await saveHasPendingSync(this._workspaceState, true);
+      this.onStatusChange("offline");
+    }
   }
 
-  stopPeriodicSync(): void {
-    if (this._periodicTimer) {
-      clearInterval(this._periodicTimer);
-      this._periodicTimer = undefined;
+  async tryCreate(todo: TodoItem): Promise<void> {
+    const workspaceId = this._getWorkspaceId();
+    if (!workspaceId) return;
+
+    try {
+      this.onStatusChange("syncing");
+      await this.apiClient.createTodo(workspaceId, todo.content, todo.order);
+      this.onStatusChange("synced");
+    } catch (err) {
+      await this._handleCrudError(err);
+    }
+  }
+
+  async tryUpdate(
+    id: string,
+    changes: { content?: string; completed?: boolean }
+  ): Promise<void> {
+    try {
+      this.onStatusChange("syncing");
+      await this.apiClient.updateTodo(id, changes);
+      this.onStatusChange("synced");
+    } catch (err) {
+      await this._handleCrudError(err);
+    }
+  }
+
+  async tryDelete(id: string): Promise<void> {
+    try {
+      this.onStatusChange("syncing");
+      await this.apiClient.deleteTodo(id);
+      this.onStatusChange("synced");
+    } catch (err) {
+      await this._handleCrudError(err);
+    }
+  }
+
+  async tryReorder(order: { id: string; order: number }[]): Promise<void> {
+    const workspaceId = this._getWorkspaceId();
+    if (!workspaceId) return;
+
+    try {
+      this.onStatusChange("syncing");
+      await this.apiClient.reorderTodos(workspaceId, order);
+      this.onStatusChange("synced");
+    } catch (err) {
+      await this._handleCrudError(err);
     }
   }
 

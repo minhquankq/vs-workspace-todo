@@ -99,4 +99,47 @@ export class ApiClient {
     if (!res.ok) throw new Error(`createWorkspace failed: ${res.status}`);
     return res.json() as Promise<{ id: string; name: string }>;
   }
+
+  async createTodo(
+    workspaceId: string,
+    content: string,
+    order: number
+  ): Promise<TodoItem> {
+    const res = await this._fetch(`/api/workspaces/${workspaceId}/todos`, {
+      method: "POST",
+      body: JSON.stringify({ content, order }),
+    });
+    if (!res.ok) throw new Error(`createTodo failed: ${res.status}`);
+    return res.json() as Promise<TodoItem>;
+  }
+
+  async updateTodo(
+    todoId: string,
+    changes: { content?: string; completed?: boolean }
+  ): Promise<void> {
+    const res = await this._fetch(`/api/todos/${todoId}`, {
+      method: "PATCH",
+      body: JSON.stringify(changes),
+    });
+    if (!res.ok) throw new Error(`updateTodo failed: ${res.status}`);
+  }
+
+  async deleteTodo(todoId: string): Promise<void> {
+    const res = await this._fetch(`/api/todos/${todoId}`, {
+      method: "DELETE",
+    });
+    if (!res.ok && res.status !== 204)
+      throw new Error(`deleteTodo failed: ${res.status}`);
+  }
+
+  async reorderTodos(
+    workspaceId: string,
+    order: { id: string; order: number }[]
+  ): Promise<void> {
+    const res = await this._fetch(`/api/workspaces/${workspaceId}/todos`, {
+      method: "PATCH",
+      body: JSON.stringify({ order }),
+    });
+    if (!res.ok) throw new Error(`reorderTodos failed: ${res.status}`);
+  }
 }

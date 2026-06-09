@@ -32,7 +32,6 @@ export class TodoViewProvider implements vscode.WebviewViewProvider {
       () => this._pushState(),
       (status, error) => this._emitSyncStatus(status, error)
     );
-    this._syncService.startPeriodicSync();
   }
 
   private async _checkAndPromptWorkspaceLink(): Promise<void> {
@@ -59,7 +58,7 @@ export class TodoViewProvider implements vscode.WebviewViewProvider {
         await this.initSync();
         // Cast needed: TS narrows _syncService to undefined via the guard above,
         // but initSync() sets it when conditions are met.
-        (this._syncService as SyncService | undefined)?.pull();
+        (this._syncService as SyncService | undefined)?.syncOnOpen();
         return;
       }
       // Stored workspace no longer exists — fall through to show link UI
@@ -76,7 +75,6 @@ export class TodoViewProvider implements vscode.WebviewViewProvider {
   }
 
   public async stopSync(): Promise<void> {
-    this._syncService?.stopPeriodicSync();
     this._syncService = undefined;
   }
 
@@ -96,13 +94,17 @@ export class TodoViewProvider implements vscode.WebviewViewProvider {
 
     webviewView.webview.html = this._getHtml(webviewView.webview);
 
+    webviewView.onDidChangeVisibility(() => {
+      if (webviewView.visible) this._syncService?.syncOnOpen();
+    }, undefined, this._context.subscriptions);
+
     webviewView.webview.onDidReceiveMessage(
       async (message: WebviewMessage) => {
         switch (message.type) {
           case "ready":
             await this._pushState();
             if (this._syncService) {
-              this._syncService.pull();
+              this._syncService.syncOnOpen();
             } else {
               await this._checkAndPromptWorkspaceLink();
             }
@@ -178,7 +180,7 @@ export class TodoViewProvider implements vscode.WebviewViewProvider {
     await saveSyncedWorkspaceName(this._context.workspaceState, workspaceName);
     await this.initSync();
     await this._pushState();
-    this._syncService?.pull();
+    this._syncService?.push();
   }
 
   private async _handleCreateWorkspace(name: string): Promise<void> {
@@ -206,7 +208,7 @@ export class TodoViewProvider implements vscode.WebviewViewProvider {
     };
     await saveTodos(this._context.workspaceState, [...todos, newTodo]);
     this._pushState();
-    this._syncService?.push();
+    this._syncService?.tryCreate(newTodo);
   }
 
   private async _handleUpdateTodo(
@@ -229,7 +231,10 @@ export class TodoViewProvider implements vscode.WebviewViewProvider {
 
     await saveTodos(this._context.workspaceState, todos);
     this._pushState();
-    this._syncService?.push();
+    this._syncService?.tryUpdate(id, {
+      ...(content !== undefined ? { content } : {}),
+      ...(completed !== undefined ? { completed } : {}),
+    });
   }
 
   private async _handleDeleteTodo(id: string): Promise<void> {
@@ -239,7 +244,7 @@ export class TodoViewProvider implements vscode.WebviewViewProvider {
     );
     await saveTodos(this._context.workspaceState, todos);
     this._pushState();
-    this._syncService?.push();
+    this._syncService?.tryDelete(id);
   }
 
   private async _handleReorderTodos(ids: string[]): Promise<void> {
@@ -258,7 +263,7 @@ export class TodoViewProvider implements vscode.WebviewViewProvider {
     const rest = todos.filter((t) => !reorderedIds.has(t.id));
     await saveTodos(this._context.workspaceState, [...reordered, ...rest]);
     this._pushState();
-    this._syncService?.push();
+    this._syncService?.tryReorder(reordered.map((t) => ({ id: t.id, order: t.order })));
   }
 
   private async _handleUpdateSettings(
@@ -273,12 +278,16 @@ export class TodoViewProvider implements vscode.WebviewViewProvider {
 
   private async _handleClearCompleted(): Promise<void> {
     const now = Date.now();
-    const todos = getTodos(this._context.workspaceState).map((t) =>
+    const allTodos = getTodos(this._context.workspaceState);
+    const toDelete = allTodos.filter((t) => t.completed && !t.deletedAt);
+    const todos = allTodos.map((t) =>
       t.completed && !t.deletedAt ? { ...t, deletedAt: now, updatedAt: now } : t
     );
     await saveTodos(this._context.workspaceState, todos);
     this._pushState();
-    this._syncService?.push();
+    for (const t of toDelete) {
+      this._syncService?.tryDelete(t.id);
+    }
   }
 
   private async _pushState(): Promise<void> {
