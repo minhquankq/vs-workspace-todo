@@ -1,11 +1,12 @@
 import React, { useReducer, useMemo, useEffect, useState } from "react";
-import { TodoItem, Settings, SyncUser } from "../src/types";
+import { TodoItem, Settings, SyncUser, WorkspaceInfo } from "../src/types";
 import { useVsCode } from "./hooks/useVsCode";
 import SearchBar from "./components/SearchBar";
 import Toolbar from "./components/Toolbar";
 import TodoList from "./components/TodoList";
 import AddTodo from "./components/AddTodo";
 import EditDialog from "./components/EditDialog";
+import LinkView from "./components/LinkView";
 import Icon from "./components/Icon";
 
 interface State {
@@ -13,11 +14,18 @@ interface State {
   settings: Settings;
   search: string;
   user: SyncUser | null;
+  view: "list" | "link";
+  linkWorkspaces: WorkspaceInfo[];
+  linkDefaultName: string;
+  linkError: string | undefined;
 }
 
 type Action =
   | { type: "SET_STATE"; todos: TodoItem[]; settings: Settings; user?: SyncUser | null }
-  | { type: "SET_SEARCH"; search: string };
+  | { type: "SET_SEARCH"; search: string }
+  | { type: "SHOW_LINK_VIEW"; workspaces: WorkspaceInfo[]; defaultName: string }
+  | { type: "DISMISS_LINK_VIEW" }
+  | { type: "LINK_VIEW_ERROR"; error: string };
 
 function reducer(state: State, action: Action): State {
   switch (action.type) {
@@ -27,9 +35,17 @@ function reducer(state: State, action: Action): State {
         todos: action.todos,
         settings: action.settings,
         user: action.user ?? null,
+        // Dismiss link view once we have a user (sign-out clears user)
+        view: action.user ? "list" : state.view,
       };
     case "SET_SEARCH":
       return { ...state, search: action.search };
+    case "SHOW_LINK_VIEW":
+      return { ...state, view: "link", linkWorkspaces: action.workspaces, linkDefaultName: action.defaultName, linkError: undefined };
+    case "DISMISS_LINK_VIEW":
+      return { ...state, view: "list", linkError: undefined };
+    case "LINK_VIEW_ERROR":
+      return { ...state, linkError: action.error };
     default:
       return state;
   }
@@ -41,12 +57,24 @@ export default function App() {
     settings: { hideCompleted: false },
     search: "",
     user: null,
+    view: "list",
+    linkWorkspaces: [],
+    linkDefaultName: "",
+    linkError: undefined,
   });
   const [editingTodo, setEditingTodo] = useState<TodoItem | null>(null);
 
-  const { send, syncStatus, syncError } = useVsCode((todos, settings, user) => {
-    dispatch({ type: "SET_STATE", todos, settings, user });
-  });
+  const { send, syncStatus, syncError } = useVsCode(
+    (todos, settings, user) => {
+      dispatch({ type: "SET_STATE", todos, settings, user });
+    },
+    ({ workspaces, defaultName }) => {
+      dispatch({ type: "SHOW_LINK_VIEW", workspaces, defaultName });
+    },
+    (error) => {
+      dispatch({ type: "LINK_VIEW_ERROR", error });
+    }
+  );
 
   useEffect(() => {
     send({ type: "ready" });
@@ -130,6 +158,25 @@ export default function App() {
           onSave={(content) => {
             send({ type: "updateTodo", id: editingTodo.id, content });
             setEditingTodo(null);
+          }}
+        />
+      )}
+
+      {state.view === "link" && (
+        <LinkView
+          workspaces={state.linkWorkspaces}
+          defaultName={state.linkDefaultName}
+          error={state.linkError}
+          onBack={() => {
+            send({ type: "dismissLinkView" });
+            dispatch({ type: "DISMISS_LINK_VIEW" });
+          }}
+          onLink={(workspaceId, workspaceName) => {
+            send({ type: "linkWorkspace", workspaceId, workspaceName });
+            dispatch({ type: "DISMISS_LINK_VIEW" });
+          }}
+          onCreate={(name) => {
+            send({ type: "createWorkspace", name });
           }}
         />
       )}

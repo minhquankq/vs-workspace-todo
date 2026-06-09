@@ -5,6 +5,7 @@ const TODOS_KEY = "workspace-todo.todos";
 const SETTINGS_KEY = "workspace-todo.settings";
 const LAST_SYNCED_AT_KEY = "workspace-todo.lastSyncedAt";
 const SYNCED_WORKSPACE_NAME_KEY = "workspace-todo.syncedWorkspaceName";
+const LINKED_WORKSPACE_ID_KEY = "workspace-todo.linkedWorkspaceId";
 
 export function getTodos(state: vscode.Memento): TodoItem[] {
   const raw = state.get<TodoItem[]>(TODOS_KEY, []);
@@ -55,4 +56,21 @@ export async function saveSyncedWorkspaceName(
   name: string
 ): Promise<void> {
   await state.update(SYNCED_WORKSPACE_NAME_KEY, name);
+}
+
+export function getLinkedWorkspaceId(state: vscode.Memento): string | undefined {
+  return state.get<string>(LINKED_WORKSPACE_ID_KEY);
+}
+
+export async function saveLinkedWorkspaceId(
+  state: vscode.Memento,
+  id: string
+): Promise<void> {
+  await state.update(LINKED_WORKSPACE_ID_KEY, id);
+}
+
+export async function clearLinkedWorkspace(state: vscode.Memento): Promise<void> {
+  await state.update(LINKED_WORKSPACE_ID_KEY, undefined);
+  await state.update(SYNCED_WORKSPACE_NAME_KEY, undefined);
+  await state.update(LAST_SYNCED_AT_KEY, undefined);
 }

@@ -18,6 +18,12 @@ export interface SyncUser {
   name: string | null;
 }
 
+export interface WorkspaceInfo {
+  id: string;
+  name: string;
+  todoCount: number;
+}
+
 // Messages sent from the webview to the extension host
 export type WebviewMessage =
   | { type: "addTodo"; content: string }
@@ -28,9 +34,14 @@ export type WebviewMessage =
   | { type: "clearCompleted" }
   | { type: "ready" }
   | { type: "signIn" }
-  | { type: "signOut" };
+  | { type: "signOut" }
+  | { type: "linkWorkspace"; workspaceId: string; workspaceName: string }
+  | { type: "createWorkspace"; name: string }
+  | { type: "dismissLinkView" };
 
 // Messages sent from the extension host to the webview
 export type ExtensionMessage =
   | { type: "setState"; todos: TodoItem[]; settings: Settings; user?: SyncUser | null }
-  | { type: "syncStatus"; status: "syncing" | "synced" | "offline" | "error"; error?: string };
+  | { type: "syncStatus"; status: "syncing" | "synced" | "offline" | "error"; error?: string }
+  | { type: "showLinkView"; workspaces: WorkspaceInfo[]; defaultName: string }
+  | { type: "linkViewError"; error: string };

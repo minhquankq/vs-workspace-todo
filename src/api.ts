@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { AuthService } from "./auth";
-import { TodoItem, Settings, SyncUser } from "./types";
+import { TodoItem, Settings, SyncUser, WorkspaceInfo } from "./types";
 
 export interface SyncPayload {
   workspaceName: string;
@@ -82,5 +82,21 @@ export class ApiClient {
     });
     if (!res.ok && res.status !== 204)
       throw new Error(`deleteWorkspace failed: ${res.status}`);
+  }
+
+  async getWorkspaces(): Promise<WorkspaceInfo[]> {
+    const res = await this._fetch("/api/workspaces");
+    if (!res.ok) throw new Error(`getWorkspaces failed: ${res.status}`);
+    const list = await res.json() as Array<{ id: string; name: string; todos: unknown[] }>;
+    return list.map((w) => ({ id: w.id, name: w.name, todoCount: w.todos.length }));
+  }
+
+  async createWorkspace(name: string): Promise<{ id: string; name: string }> {
+    const res = await this._fetch("/api/workspaces", {
+      method: "POST",
+      body: JSON.stringify({ name }),
+    });
+    if (!res.ok) throw new Error(`createWorkspace failed: ${res.status}`);
+    return res.json() as Promise<{ id: string; name: string }>;
   }
 }

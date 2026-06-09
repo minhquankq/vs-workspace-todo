@@ -1,8 +1,8 @@
 import * as vscode from "vscode";
 import * as path from "path";
 import * as crypto from "crypto";
-import { getTodos, saveTodos, getSettings, saveSettings } from "./storage";
-import { TodoItem, Settings, WebviewMessage, ExtensionMessage } from "./types";
+import { getTodos, saveTodos, getSettings, saveSettings, getLinkedWorkspaceId, saveLinkedWorkspaceId, saveSyncedWorkspaceName, clearLinkedWorkspace } from "./storage";
+import { TodoItem, Settings, WebviewMessage, ExtensionMessage, WorkspaceInfo } from "./types";
 import { AuthService } from "./auth";
 import { ApiClient } from "./api";
 import { SyncService } from "./sync";
@@ -23,6 +23,9 @@ export class TodoViewProvider implements vscode.WebviewViewProvider {
     const signedIn = await this._authService.isSignedIn(this._context);
     if (!signedIn) return;
 
+    const workspaceId = getLinkedWorkspaceId(this._context.workspaceState);
+    if (!workspaceId) return;
+
     this._syncService = new SyncService(
       this._apiClient,
       this._context,
@@ -30,6 +33,46 @@ export class TodoViewProvider implements vscode.WebviewViewProvider {
       (status, error) => this._emitSyncStatus(status, error)
     );
     this._syncService.startPeriodicSync();
+  }
+
+  private async _checkAndPromptWorkspaceLink(): Promise<void> {
+    const signedIn = await this._authService.isSignedIn(this._context);
+    if (!signedIn) return;
+
+    // If sync is already running, no need to re-check
+    if (this._syncService) return;
+
+    let workspaces: WorkspaceInfo[] = [];
+    try {
+      workspaces = await this._apiClient.getWorkspaces();
+    } catch {
+      // Network error — don't block UI, user can retry later via sync badge
+      return;
+    }
+
+    const storedId = getLinkedWorkspaceId(this._context.workspaceState);
+    if (storedId) {
+      const match = workspaces.find((w) => w.id === storedId);
+      if (match) {
+        // Workspace still valid — auto-link and start sync
+        await saveSyncedWorkspaceName(this._context.workspaceState, match.name);
+        await this.initSync();
+        // Cast needed: TS narrows _syncService to undefined via the guard above,
+        // but initSync() sets it when conditions are met.
+        (this._syncService as SyncService | undefined)?.pull();
+        return;
+      }
+      // Stored workspace no longer exists — fall through to show link UI
+    }
+
+    const defaultName =
+      vscode.workspace.workspaceFolders?.[0]?.name ?? "My Workspace";
+    const msg: ExtensionMessage = {
+      type: "showLinkView",
+      workspaces,
+      defaultName,
+    };
+    this._view?.webview.postMessage(msg);
   }
 
   public async stopSync(): Promise<void> {
@@ -58,7 +101,11 @@ export class TodoViewProvider implements vscode.WebviewViewProvider {
         switch (message.type) {
           case "ready":
             await this._pushState();
-            this._syncService?.pull();
+            if (this._syncService) {
+              this._syncService.pull();
+            } else {
+              await this._checkAndPromptWorkspaceLink();
+            }
             break;
           case "addTodo":
             await this._handleAddTodo(message.content);
@@ -88,6 +135,15 @@ export class TodoViewProvider implements vscode.WebviewViewProvider {
           case "signOut":
             await this._handleSignOut();
             break;
+          case "linkWorkspace":
+            await this._handleLinkWorkspace(message.workspaceId, message.workspaceName);
+            break;
+          case "createWorkspace":
+            await this._handleCreateWorkspace(message.name);
+            break;
+          case "dismissLinkView":
+            // User closed the link view; stays offline until they link later
+            break;
         }
       },
       undefined,
@@ -102,8 +158,8 @@ export class TodoViewProvider implements vscode.WebviewViewProvider {
   private async _handleSignIn(): Promise<void> {
     try {
       await this._authService.signIn(this._context, this._apiClient.baseUrl);
-      await this.initSync();
       await this._pushState();
+      await this._checkAndPromptWorkspaceLink();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       vscode.window.showErrorMessage(`Sign in failed: ${msg}`);
@@ -113,7 +169,27 @@ export class TodoViewProvider implements vscode.WebviewViewProvider {
   private async _handleSignOut(): Promise<void> {
     await this.stopSync();
     await this._authService.signOut(this._context);
+    await clearLinkedWorkspace(this._context.workspaceState);
     await this._pushState();
+  }
+
+  private async _handleLinkWorkspace(workspaceId: string, workspaceName: string): Promise<void> {
+    await saveLinkedWorkspaceId(this._context.workspaceState, workspaceId);
+    await saveSyncedWorkspaceName(this._context.workspaceState, workspaceName);
+    await this.initSync();
+    await this._pushState();
+    this._syncService?.pull();
+  }
+
+  private async _handleCreateWorkspace(name: string): Promise<void> {
+    try {
+      const ws = await this._apiClient.createWorkspace(name);
+      await this._handleLinkWorkspace(ws.id, ws.name);
+    } catch (err: unknown) {
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      const msg: ExtensionMessage = { type: "linkViewError", error: errorMsg };
+      this._view?.webview.postMessage(msg);
+    }
   }
 
   private async _handleAddTodo(content: string): Promise<void> {
