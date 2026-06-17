@@ -32,6 +32,7 @@ function applyFormat(
  *   Ctrl/Cmd+B  → **bold**
  *   Ctrl/Cmd+I  → *italic*
  *   Ctrl/Cmd+U  → <u>underline</u>
+ *   Ctrl/Cmd+D  → ~~strikethrough~~ (selection or current line; skips list marker)
  *
  * Usage:
  *   const { handleShortcut } = useMarkdownShortcuts(value, setValue, textareaRef);
@@ -73,6 +74,32 @@ export function useMarkdownShortcuts(
         before = "<u>";
         after = "</u>";
         break;
+      case "d": {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const ta = e.currentTarget as HTMLTextAreaElement;
+        let strikeStart = ta.selectionStart;
+        let strikeEnd = ta.selectionEnd;
+
+        if (strikeStart === strikeEnd) {
+          // No selection — operate on the current line
+          const lineStart = value.lastIndexOf("\n", strikeStart - 1) + 1;
+          const nextNewline = value.indexOf("\n", strikeStart);
+          const lineEnd = nextNewline === -1 ? value.length : nextNewline;
+
+          const line = value.substring(lineStart, lineEnd);
+          const listMatch = line.match(/^(\s*[-*+]\s+)/);
+
+          strikeStart = listMatch ? lineStart + listMatch[1].length : lineStart;
+          strikeEnd = lineEnd;
+        }
+
+        const { newValue, selection } = applyFormat(value, strikeStart, strikeEnd, "~~", "~~");
+        setValue(newValue);
+        pendingSelectionRef.current = selection;
+        return true;
+      }
       default:
         return false;
     }

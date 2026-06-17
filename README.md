@@ -46,6 +46,7 @@ These shortcuts work in both the **add** input and the **edit** textarea. Select
 | `Ctrl+B` | `⌘B` | **Bold** — wraps with `**...**` |
 | `Ctrl+I` | `⌘I` | *Italic* — wraps with `*...*` |
 | `Ctrl+U` | `⌘U` | Underline — wraps with `<u>...</u>` |
+| `Ctrl+D` | `⌘D` | ~~Strikethrough~~ — wraps with `~~...~~`; on a list line, skips the `- ` prefix |
 | `Alt+↵` | `⌘↵` | Submit / save the todo |
 | `Escape` | `Escape` | Cancel editing |
 
