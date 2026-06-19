@@ -24,7 +24,7 @@ export interface LinkViewPayload {
 }
 
 export function useVsCode(
-  onState: (todos: TodoItem[], settings: Settings, user?: SyncUser | null) => void,
+  onState: (todos: TodoItem[], settings: Settings, user?: SyncUser | null, hasPendingSync?: boolean) => void,
   onLinkView?: (payload: LinkViewPayload) => void,
   onLinkViewError?: (error: string) => void
 ) {
@@ -42,7 +42,7 @@ export function useVsCode(
     const handler = (event: MessageEvent) => {
       const msg = event.data as ExtensionMessage;
       if (msg.type === "setState") {
-        onStateRef.current(msg.todos, msg.settings, msg.user);
+        onStateRef.current(msg.todos, msg.settings, msg.user, msg.hasPendingSync);
       } else if (msg.type === "syncStatus") {
         setSyncStatus(msg.status);
         setSyncError(msg.error);

@@ -6,6 +6,7 @@ import {
   getSettings,
   getLastSyncedAt,
   saveLastSyncedAt,
+  clearLastSyncedAt,
   getSyncedWorkspaceName,
   saveSyncedWorkspaceName,
   getLinkedWorkspaceId,
@@ -106,9 +107,16 @@ export class SyncService {
     const pending = getHasPendingSync(this._workspaceState);
     if (pending) {
       await this.push();
-    } else {
-      await this.pull();
+      return;
     }
+
+    const lastSyncedAt = getLastSyncedAt(this._workspaceState);
+    const ONE_HOUR_MS = 60 * 60 * 1000;
+    if (lastSyncedAt && Date.now() - lastSyncedAt < ONE_HOUR_MS) {
+      return;
+    }
+
+    await this.pull();
   }
 
   private async _handleCrudError(err: unknown): Promise<void> {
@@ -127,7 +135,7 @@ export class SyncService {
 
     try {
       this.onStatusChange("syncing");
-      await this.apiClient.createTodo(workspaceId, todo.content, todo.order);
+      await this.apiClient.createTodo(workspaceId, todo.content, todo.order, todo.id);
       this.onStatusChange("synced");
     } catch (err) {
       await this._handleCrudError(err);
@@ -168,6 +176,14 @@ export class SyncService {
     } catch (err) {
       await this._handleCrudError(err);
     }
+  }
+
+  async resetAndPull(): Promise<void> {
+    await saveTodos(this._workspaceState, []);
+    await clearLastSyncedAt(this._workspaceState);
+    await saveHasPendingSync(this._workspaceState, false);
+    this.onStateChange();
+    await this.pull();
   }
 
   private async _mergeServerResponse(serverTodos: TodoItem[]): Promise<void> {

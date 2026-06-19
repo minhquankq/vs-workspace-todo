@@ -59,6 +59,20 @@ export function activate(context: vscode.ExtensionContext): void {
   );
 
   context.subscriptions.push(
+    vscode.commands.registerCommand("workspace-todo.resetLocalData", async () => {
+      const confirmed = await vscode.window.showWarningMessage(
+        "Reset local todos and re-pull from the server? This will replace your local list with the server copy.",
+        { modal: true },
+        "Reset & Re-sync"
+      );
+      if (confirmed === "Reset & Re-sync") {
+        await provider.resetLocalData();
+        vscode.window.showInformationMessage("Workspace Todo: local data reset and synced from server.");
+      }
+    })
+  );
+
+  context.subscriptions.push(
     vscode.commands.registerCommand("workspace-todo.syncNow", async () => {
       const signedIn = await authService.isSignedIn(context);
       if (!signedIn) {

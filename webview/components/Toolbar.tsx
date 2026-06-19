@@ -8,10 +8,13 @@ interface Props {
   user: SyncUser | null;
   syncStatus: SyncStatus;
   syncError?: string;
+  hasPendingSync: boolean;
   onClearCompleted: () => void;
   onToggleHideCompleted: () => void;
   onSignIn: () => void;
   onSignOut: () => void;
+  onResetLocalData: () => void;
+  onSyncNow: () => void;
 }
 
 const SYNC_STATE: Record<SyncStatus, { icon: "cloud" | "sync" | "cloud-check" | "cloud-off" | "warn"; cls: string; label: string }> = {
@@ -27,12 +30,16 @@ export default function Toolbar({
   user,
   syncStatus,
   syncError,
+  hasPendingSync,
   onClearCompleted,
   onToggleHideCompleted,
   onSignIn,
   onSignOut,
+  onResetLocalData,
+  onSyncNow,
 }: Props) {
   const [menu, setMenu] = useState(false);
+  const [confirmReset, setConfirmReset] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -46,7 +53,26 @@ export default function Toolbar({
     return () => document.removeEventListener("mousedown", handleClick);
   }, [menu]);
 
+  // Reset confirm state whenever the menu closes
+  useEffect(() => {
+    if (!menu) setConfirmReset(false);
+  }, [menu]);
+
   const sync = SYNC_STATE[syncStatus];
+  const canSync = !!user && syncStatus !== "syncing";
+  const syncTitle = !user
+    ? sync.label
+    : canSync
+      ? (hasPendingSync ? "Push pending changes" : "Pull latest")
+      : sync.label + (syncError ? ": " + syncError : "");
+
+  function handleSyncClick() {
+    if (!user) {
+      onSignIn();
+    } else if (canSync) {
+      onSyncNow();
+    }
+  }
 
   return (
     <div className="p-head">
@@ -57,8 +83,8 @@ export default function Toolbar({
       <div className="p-actions">
         <button
           className={"sync-badge " + sync.cls}
-          title={sync.label + (syncError ? ": " + syncError : "")}
-          onClick={user ? undefined : onSignIn}
+          title={syncTitle}
+          onClick={handleSyncClick}
         >
           <Icon name={sync.icon} size={15} />
         </button>
@@ -118,6 +144,34 @@ export default function Toolbar({
 
                 {user && (
                   <>
+                    <div className="menu-sep" />
+                    {confirmReset ? (
+                      <div className="mi-confirm-panel">
+                        <p className="mi-warn-msg">
+                          Local todos will be replaced with the server copy. Any local-only changes will be lost.
+                        </p>
+                        <div className="mi-confirm-btns">
+                          <button
+                            className="mi mi-danger"
+                            onClick={() => { setMenu(false); onResetLocalData(); }}
+                          >
+                            <Icon name="warn" size={14} />
+                            <span>Reset &amp; re-sync</span>
+                          </button>
+                          <button className="mi" onClick={() => setConfirmReset(false)}>
+                            <span>Cancel</span>
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        className="mi mi-danger"
+                        onClick={() => setConfirmReset(true)}
+                      >
+                        <Icon name="warn" size={15} />
+                        <span>Reset local data…</span>
+                      </button>
+                    )}
                     <div className="menu-sep" />
                     <button
                       className="mi"

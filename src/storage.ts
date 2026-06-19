@@ -48,6 +48,10 @@ export async function saveLastSyncedAt(
   await state.update(LAST_SYNCED_AT_KEY, ts);
 }
 
+export async function clearLastSyncedAt(state: vscode.Memento): Promise<void> {
+  await state.update(LAST_SYNCED_AT_KEY, undefined);
+}
+
 export function getSyncedWorkspaceName(state: vscode.Memento): string | undefined {
   return state.get<string>(SYNCED_WORKSPACE_NAME_KEY);
 }

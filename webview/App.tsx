@@ -14,6 +14,7 @@ interface State {
   settings: Settings;
   search: string;
   user: SyncUser | null;
+  hasPendingSync: boolean;
   view: "list" | "link";
   linkWorkspaces: WorkspaceInfo[];
   linkDefaultName: string;
@@ -21,7 +22,7 @@ interface State {
 }
 
 type Action =
-  | { type: "SET_STATE"; todos: TodoItem[]; settings: Settings; user?: SyncUser | null }
+  | { type: "SET_STATE"; todos: TodoItem[]; settings: Settings; user?: SyncUser | null; hasPendingSync?: boolean }
   | { type: "SET_SEARCH"; search: string }
   | { type: "SHOW_LINK_VIEW"; workspaces: WorkspaceInfo[]; defaultName: string }
   | { type: "DISMISS_LINK_VIEW" }
@@ -35,6 +36,7 @@ function reducer(state: State, action: Action): State {
         todos: action.todos,
         settings: action.settings,
         user: action.user ?? null,
+        hasPendingSync: action.hasPendingSync ?? false,
         // Dismiss link view once we have a user (sign-out clears user)
         view: action.user ? "list" : state.view,
       };
@@ -57,6 +59,7 @@ export default function App() {
     settings: { hideCompleted: false },
     search: "",
     user: null,
+    hasPendingSync: false,
     view: "list",
     linkWorkspaces: [],
     linkDefaultName: "",
@@ -65,8 +68,8 @@ export default function App() {
   const [editingTodo, setEditingTodo] = useState<TodoItem | null>(null);
 
   const { send, syncStatus, syncError } = useVsCode(
-    (todos, settings, user) => {
-      dispatch({ type: "SET_STATE", todos, settings, user });
+    (todos, settings, user, hasPendingSync) => {
+      dispatch({ type: "SET_STATE", todos, settings, user, hasPendingSync: hasPendingSync ?? false });
     },
     ({ workspaces, defaultName }) => {
       dispatch({ type: "SHOW_LINK_VIEW", workspaces, defaultName });
@@ -109,6 +112,7 @@ export default function App() {
         user={state.user}
         syncStatus={syncStatus}
         syncError={syncError}
+        hasPendingSync={state.hasPendingSync}
         onClearCompleted={() => send({ type: "clearCompleted" })}
         onToggleHideCompleted={() =>
           send({
@@ -118,6 +122,8 @@ export default function App() {
         }
         onSignIn={() => send({ type: "signIn" })}
         onSignOut={() => send({ type: "signOut" })}
+        onResetLocalData={() => send({ type: "resetLocalData" })}
+        onSyncNow={() => send({ type: "syncNow" })}
       />
 
       <SearchBar

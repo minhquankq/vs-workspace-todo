@@ -37,11 +37,13 @@ export type WebviewMessage =
   | { type: "signOut" }
   | { type: "linkWorkspace"; workspaceId: string; workspaceName: string }
   | { type: "createWorkspace"; name: string }
-  | { type: "dismissLinkView" };
+  | { type: "dismissLinkView" }
+  | { type: "resetLocalData" }
+  | { type: "syncNow" };
 
 // Messages sent from the extension host to the webview
 export type ExtensionMessage =
-  | { type: "setState"; todos: TodoItem[]; settings: Settings; user?: SyncUser | null }
+  | { type: "setState"; todos: TodoItem[]; settings: Settings; user?: SyncUser | null; hasPendingSync?: boolean }
   | { type: "syncStatus"; status: "syncing" | "synced" | "offline" | "error"; error?: string }
   | { type: "showLinkView"; workspaces: WorkspaceInfo[]; defaultName: string }
   | { type: "linkViewError"; error: string };

@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import * as path from "path";
 import * as crypto from "crypto";
-import { getTodos, saveTodos, getSettings, saveSettings, getLinkedWorkspaceId, saveLinkedWorkspaceId, saveSyncedWorkspaceName, clearLinkedWorkspace } from "./storage";
+import { getTodos, saveTodos, getSettings, saveSettings, getLinkedWorkspaceId, saveLinkedWorkspaceId, saveSyncedWorkspaceName, clearLinkedWorkspace, getHasPendingSync } from "./storage";
 import { TodoItem, Settings, WebviewMessage, ExtensionMessage, WorkspaceInfo } from "./types";
 import { AuthService } from "./auth";
 import { ApiClient } from "./api";
@@ -78,6 +78,14 @@ export class TodoViewProvider implements vscode.WebviewViewProvider {
     this._syncService = undefined;
   }
 
+  public async resetLocalData(): Promise<void> {
+    if (!this._syncService) {
+      vscode.window.showWarningMessage("Workspace Todo: not linked to a workspace — nothing to reset.");
+      return;
+    }
+    await this._syncService.resetAndPull();
+  }
+
   public resolveWebviewView(
     webviewView: vscode.WebviewView,
     _context: vscode.WebviewViewResolveContext,
@@ -146,6 +154,18 @@ export class TodoViewProvider implements vscode.WebviewViewProvider {
           case "dismissLinkView":
             // User closed the link view; stays offline until they link later
             break;
+          case "resetLocalData":
+            await this.resetLocalData();
+            break;
+          case "syncNow": {
+            const pending = getHasPendingSync(this._context.workspaceState);
+            if (pending) {
+              this._syncService?.push();
+            } else {
+              this._syncService?.pull();
+            }
+            break;
+          }
         }
       },
       undefined,
@@ -297,7 +317,8 @@ export class TodoViewProvider implements vscode.WebviewViewProvider {
     const todos = allTodos.filter((t) => !t.deletedAt);
     const settings = getSettings(this._context.workspaceState);
     const user = await this._authService.getUser(this._context);
-    const msg: ExtensionMessage = { type: "setState", todos, settings, user };
+    const hasPendingSync = getHasPendingSync(this._context.workspaceState);
+    const msg: ExtensionMessage = { type: "setState", todos, settings, user, hasPendingSync };
     this._view.webview.postMessage(msg);
   }
 

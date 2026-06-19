@@ -103,11 +103,12 @@ export class ApiClient {
   async createTodo(
     workspaceId: string,
     content: string,
-    order: number
+    order: number,
+    id: string
   ): Promise<TodoItem> {
     const res = await this._fetch(`/api/workspaces/${workspaceId}/todos`, {
       method: "POST",
-      body: JSON.stringify({ content, order }),
+      body: JSON.stringify({ id, content, order }),
     });
     if (!res.ok) throw new Error(`createTodo failed: ${res.status}`);
     return res.json() as Promise<TodoItem>;

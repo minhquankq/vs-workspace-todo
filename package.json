@@ -2,7 +2,7 @@
   "name": "vs-workspace-todo",
   "displayName": "Workspace Todo",
   "description": "Workspace-scoped todo list with markdown support",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "publisher": "quan-vo",
   "icon": "media/icon.png",
   "repository": {
@@ -57,6 +57,11 @@
       {
         "command": "workspace-todo.syncNow",
         "title": "Workspace Todo: Sync Now",
+        "category": "Workspace Todo"
+      },
+      {
+        "command": "workspace-todo.resetLocalData",
+        "title": "Workspace Todo: Reset Local Data",
         "category": "Workspace Todo"
       }
     ],

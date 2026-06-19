@@ -227,6 +227,15 @@ body {
 .acct-name { font-size: 13px; font-weight: 600; }
 .acct-sub  { font-size: 11px; color: var(--fg-2); margin-top: 1px; }
 
+.mi.mi-danger { color: var(--vscode-errorForeground, #f48771); }
+.mi.mi-danger svg { color: var(--vscode-errorForeground, #f48771); }
+.mi.mi-danger:hover { background: rgba(244, 135, 113, 0.15); color: var(--vscode-errorForeground, #f48771); }
+.mi.mi-danger:hover svg { color: var(--vscode-errorForeground, #f48771); }
+
+.mi-confirm-panel { padding: 2px 2px 0; }
+.mi-warn-msg { font-size: 12px; color: var(--fg-2); line-height: 1.45; padding: 4px 9px 8px; }
+.mi-confirm-btns { display: flex; flex-direction: column; gap: 2px; }
+
 /* ---- Search ---- */
 .p-search {
   position: relative;
