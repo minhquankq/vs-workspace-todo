@@ -1,6 +1,6 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState } from "react";
 import { TodoItem } from "../../src/types";
-import { useMarkdownShortcuts } from "../hooks/useMarkdownShortcuts";
+import TodoEditor from "./TodoEditor";
 import Icon from "./Icon";
 
 interface Props {
@@ -11,33 +11,9 @@ interface Props {
 
 export default function EditDialog({ todo, onClose, onSave }: Props) {
   const [value, setValue] = useState(todo.content);
-  const ref = useRef<HTMLTextAreaElement>(null);
-  const { handleShortcut } = useMarkdownShortcuts(value, setValue, ref);
 
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    el.focus();
-    el.style.height = "auto";
-    el.style.height = el.scrollHeight + "px";
-    el.setSelectionRange(el.value.length, el.value.length);
-  }, []);
-
-  function handleChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
-    setValue(e.target.value);
-    e.target.style.height = "auto";
-    e.target.style.height = e.target.scrollHeight + "px";
-  }
-
-  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
-    if (handleShortcut(e)) return;
-    if ((e.metaKey || e.altKey) && e.key === "Enter") {
-      e.preventDefault();
-      onSave(value.trim());
-    } else if (e.key === "Escape") {
-      e.preventDefault();
-      onClose();
-    }
+  function handleSave() {
+    onSave(value.trim());
   }
 
   return (
@@ -49,12 +25,13 @@ export default function EditDialog({ todo, onClose, onSave }: Props) {
         <span>Edit todo</span>
       </div>
       <div className="ov-body">
-        <textarea
-          ref={ref}
-          className="edit-ta"
+        <TodoEditor
           value={value}
-          onChange={handleChange}
-          onKeyDown={handleKeyDown}
+          onChange={setValue}
+          onSubmit={handleSave}
+          onCancel={onClose}
+          textareaClassName="edit-ta"
+          autoFocus
         />
         <div className="ov-note">⌘↵ to save · Esc to cancel · markdown supported</div>
       </div>
@@ -62,7 +39,7 @@ export default function EditDialog({ todo, onClose, onSave }: Props) {
         <button className="btn-ghost" onClick={onClose}>Cancel</button>
         <button
           className="btn-primary"
-          onClick={() => onSave(value.trim())}
+          onClick={handleSave}
           disabled={!value.trim()}
         >
           Save

@@ -868,6 +868,8 @@ body {
 
 .ti:focus { border-color: var(--accent); }
 
+.ov-body .add-tools { margin-bottom: 6px; }
+
 /* Edit textarea */
 .edit-ta {
   width: 100%;
