@@ -104,7 +104,7 @@ export class TodoViewProvider implements vscode.WebviewViewProvider {
     webviewView.webview.html = this._getHtml(webviewView.webview);
 
     webviewView.onDidChangeVisibility(() => {
-      if (webviewView.visible) this._syncService?.syncOnOpen();
+      if (webviewView.visible) this._pushState();
     }, undefined, this._context.subscriptions);
 
     webviewView.webview.onDidReceiveMessage(
@@ -112,11 +112,6 @@ export class TodoViewProvider implements vscode.WebviewViewProvider {
         switch (message.type) {
           case "ready":
             await this._pushState();
-            if (this._syncService) {
-              this._syncService.syncOnOpen();
-            } else {
-              await this._checkAndPromptWorkspaceLink();
-            }
             break;
           case "addTodo":
             await this._handleAddTodo(message.content);
@@ -159,11 +154,15 @@ export class TodoViewProvider implements vscode.WebviewViewProvider {
             await this.resetLocalData();
             break;
           case "syncNow": {
-            const pending = getHasPendingSync(this._context.workspaceState);
-            if (pending) {
-              this._syncService?.push();
+            if (this._syncService) {
+              const pending = getHasPendingSync(this._context.workspaceState);
+              if (pending) {
+                this._syncService.push();
+              } else {
+                this._syncService.pull();
+              }
             } else {
-              this._syncService?.pull();
+              await this._checkAndPromptWorkspaceLink();
             }
             break;
           }

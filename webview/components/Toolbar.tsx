@@ -62,9 +62,11 @@ export default function Toolbar({
   const canSync = !!user && syncStatus !== "syncing";
   const syncTitle = !user
     ? sync.label
-    : canSync
-      ? (hasPendingSync ? "Push pending changes" : "Pull latest")
-      : sync.label + (syncError ? ": " + syncError : "");
+    : syncStatus === "idle"
+      ? "Click to link workspace"
+      : canSync
+        ? (hasPendingSync ? "Push pending changes" : "Pull latest")
+        : sync.label + (syncError ? ": " + syncError : "");
 
   function handleSyncClick() {
     if (!user) {
