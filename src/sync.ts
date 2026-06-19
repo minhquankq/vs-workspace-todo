@@ -22,7 +22,8 @@ export class SyncService {
     private readonly apiClient: ApiClient,
     private readonly context: vscode.ExtensionContext,
     private readonly onStateChange: () => void,
-    private readonly onStatusChange: (status: SyncStatus, error?: string) => void
+    private readonly onStatusChange: (status: SyncStatus, error?: string) => void,
+    private readonly onItemSynced: (id: string) => Promise<void>
   ) {}
 
   private get _workspaceState() {
@@ -136,6 +137,7 @@ export class SyncService {
     try {
       this.onStatusChange("syncing");
       await this.apiClient.createTodo(workspaceId, todo.content, todo.order, todo.id);
+      await this.onItemSynced(todo.id);
       this.onStatusChange("synced");
     } catch (err) {
       await this._handleCrudError(err);
@@ -149,6 +151,7 @@ export class SyncService {
     try {
       this.onStatusChange("syncing");
       await this.apiClient.updateTodo(id, changes);
+      await this.onItemSynced(id);
       this.onStatusChange("synced");
     } catch (err) {
       await this._handleCrudError(err);
@@ -197,6 +200,8 @@ export class SyncService {
       }
     }
 
-    await saveTodos(this._workspaceState, Array.from(localMap.values()));
+    // Clear pendingSync on all items — server is now in sync
+    const merged = Array.from(localMap.values()).map(({ pendingSync: _, ...t }) => t);
+    await saveTodos(this._workspaceState, merged);
   }
 }

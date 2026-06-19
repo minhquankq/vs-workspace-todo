@@ -6,6 +6,7 @@ export interface TodoItem {
   order: number;
   updatedAt: number;
   deletedAt?: number;
+  pendingSync?: boolean;
 }
 
 export interface Settings {

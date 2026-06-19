@@ -30,7 +30,8 @@ export class TodoViewProvider implements vscode.WebviewViewProvider {
       this._apiClient,
       this._context,
       () => this._pushState(),
-      (status, error) => this._emitSyncStatus(status, error)
+      (status, error) => this._emitSyncStatus(status, error),
+      (id) => this._handleItemSynced(id)
     );
   }
 
@@ -188,10 +189,21 @@ export class TodoViewProvider implements vscode.WebviewViewProvider {
     }
   }
 
+  private async _handleItemSynced(id: string): Promise<void> {
+    const todos = getTodos(this._context.workspaceState).map((t) =>
+      t.id === id ? { ...t, pendingSync: undefined } : t
+    );
+    await saveTodos(this._context.workspaceState, todos);
+    await this._pushState();
+  }
+
   private async _handleSignOut(): Promise<void> {
     await this.stopSync();
     await this._authService.signOut(this._context);
     await clearLinkedWorkspace(this._context.workspaceState);
+    // Clear any pending indicators since sync is no longer active
+    const todos = getTodos(this._context.workspaceState).map(({ pendingSync: _, ...t }) => t);
+    await saveTodos(this._context.workspaceState, todos);
     await this._pushState();
   }
 
@@ -225,6 +237,7 @@ export class TodoViewProvider implements vscode.WebviewViewProvider {
       createdAt: now,
       order: maxOrder + 1,
       updatedAt: now,
+      pendingSync: this._syncService ? true : undefined,
     };
     await saveTodos(this._context.workspaceState, [...todos, newTodo]);
     this._pushState();
@@ -246,6 +259,7 @@ export class TodoViewProvider implements vscode.WebviewViewProvider {
         ...(content !== undefined ? { content } : {}),
         ...(completed !== undefined ? { completed } : {}),
         updatedAt: now,
+        pendingSync: this._syncService ? true : undefined,
       };
     });
 

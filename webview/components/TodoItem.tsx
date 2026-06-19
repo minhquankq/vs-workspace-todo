@@ -18,11 +18,12 @@ export default function TodoItemView({
 }: Props) {
   const [hover, setHover] = useState(false);
   const done = todo.completed;
+  const pending = todo.pendingSync && !done;
   const renderedHtml = marked.parse(todo.content);
 
   return (
     <div
-      className={"todo" + (done ? " done" : "")}
+      className={"todo" + (done ? " done" : "") + (pending ? " pending" : "")}
       data-id={todo.id}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}

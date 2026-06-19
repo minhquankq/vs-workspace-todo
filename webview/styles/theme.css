@@ -365,6 +365,7 @@ body {
 .todo:hover { background: rgba(255, 255, 255, 0.035); }
 .todo.dragging { opacity: 0.4; }
 .todo.dragover { border-top: 2px solid var(--accent); border-radius: 0; }
+.todo.pending { box-shadow: inset 2px 0 0 var(--warn); }
 
 /* Drag handle */
 .grip {
