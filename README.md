@@ -12,11 +12,11 @@ Website: [https://vs-todo.quans.pro](https://vs-todo.quans.pro)
 
 ## Basic functions
 
-https://github.com/user-attachments/assets/2e20eef5-6063-44d4-968e-9647f4ed81d5
+<video src="https://github.com/user-attachments/assets/2e20eef5-6063-44d4-968e-9647f4ed81d5" controls autoplay loop muted style="max-width: 100%;"></video>
 
 ## Sync to Cloud
 
-https://github.com/user-attachments/assets/35dab02b-afde-4771-a606-77d256c31e5b
+<video src="https://github.com/user-attachments/assets/35dab02b-afde-4771-a606-77d256c31e5b" controls autoplay loop muted style="max-width: 100%;"></video>
 
 ## Features
 
