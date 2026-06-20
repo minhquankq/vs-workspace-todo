@@ -1,3 +1,6 @@
+
+
+
 # Workspace Todo
 
 A VS Code extension that provides a workspace-scoped todo list with markdown support, cloud sync, and an Activity Bar panel.
@@ -7,7 +10,13 @@ A VS Code extension that provides a workspace-scoped todo list with markdown sup
 
 Website: [https://vs-todo.quans.pro](https://vs-todo.quans.pro)
 
-![Demo](media/demo-1.gif)
+## Basic functions
+
+https://github.com/user-attachments/assets/2e20eef5-6063-44d4-968e-9647f4ed81d5
+
+## Sync to Cloud
+
+https://github.com/user-attachments/assets/35dab02b-afde-4771-a606-77d256c31e5b
 
 ## Features
 
