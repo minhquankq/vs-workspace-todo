@@ -465,6 +465,22 @@ body {
   color: var(--err);
 }
 
+/* Lists inside todo body */
+.todo-body ul,
+.todo-body ol {
+  padding-left: 1.4em;
+  margin: 2px 0;
+}
+
+.todo-body li {
+  margin: 1px 0;
+}
+
+.todo-body li > ul,
+.todo-body li > ol {
+  margin: 1px 0;
+}
+
 /* Inline markdown */
 .md-code {
   font-family: var(--mono);
