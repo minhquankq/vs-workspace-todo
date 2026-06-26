@@ -1,5 +1,6 @@
 import React, { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 import { useMarkdownShortcuts } from "../hooks/useMarkdownShortcuts";
+import { useListEditing } from "../hooks/useListEditing";
 import Icon from "./Icon";
 
 interface Props {
@@ -40,6 +41,7 @@ const TodoEditor = forwardRef<HTMLTextAreaElement, Props>(function TodoEditor(
   const internalRef = useRef<HTMLTextAreaElement>(null);
   useImperativeHandle(ref, () => internalRef.current!);
   const { handleShortcut } = useMarkdownShortcuts(value, onChange, internalRef);
+  const { handleListKey } = useListEditing(value, onChange, internalRef);
 
   useEffect(() => {
     const el = internalRef.current;
@@ -65,6 +67,7 @@ const TodoEditor = forwardRef<HTMLTextAreaElement, Props>(function TodoEditor(
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (handleShortcut(e)) return;
+    if (handleListKey(e)) return;
     if ((e.metaKey || e.altKey) && e.key === "Enter") {
       e.preventDefault();
       onSubmit();
