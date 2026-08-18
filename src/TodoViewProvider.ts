@@ -1,11 +1,12 @@
 import * as vscode from "vscode";
 import * as path from "path";
 import * as crypto from "crypto";
-import { getTodos, saveTodos, getSettings, saveSettings, getLinkedWorkspaceId, saveLinkedWorkspaceId, saveSyncedWorkspaceName, clearLinkedWorkspace, getHasPendingSync } from "./storage";
+import { getTodos, saveTodos, getSettings, saveSettings, getLinkedWorkspaceId, saveLinkedWorkspaceId, saveSyncedWorkspaceName, clearLinkedWorkspace, getHasPendingSync, saveHasPendingSync, getSyncedUserId, saveSyncedUserId } from "./storage";
 import { TodoItem, Settings, WebviewMessage, ExtensionMessage, WorkspaceInfo } from "./types";
-import { AuthService } from "./auth";
+import { AuthService, AuthState } from "./auth";
 import { ApiClient } from "./api";
 import { SyncService } from "./sync";
+import { log } from "./log";
 
 export class TodoViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewId = "workspace-todo.mainView";
@@ -17,10 +18,16 @@ export class TodoViewProvider implements vscode.WebviewViewProvider {
     private readonly _context: vscode.ExtensionContext,
     private readonly _authService: AuthService,
     private readonly _apiClient: ApiClient
-  ) {}
+  ) {
+    _context.subscriptions.push(
+      _authService.onDidChangeAuth((state) => {
+        void this._handleAuthStateChange(state);
+      })
+    );
+  }
 
   public async initSync(): Promise<void> {
-    const signedIn = await this._authService.isSignedIn(this._context);
+    const signedIn = await this._authService.isSignedIn();
     if (!signedIn) return;
 
     const workspaceId = getLinkedWorkspaceId(this._context.workspaceState);
@@ -36,7 +43,7 @@ export class TodoViewProvider implements vscode.WebviewViewProvider {
   }
 
   private async _checkAndPromptWorkspaceLink(): Promise<void> {
-    const signedIn = await this._authService.isSignedIn(this._context);
+    const signedIn = await this._authService.isSignedIn();
     if (!signedIn) return;
 
     // If sync is already running, no need to re-check
@@ -87,6 +94,79 @@ export class TodoViewProvider implements vscode.WebviewViewProvider {
     await this._syncService.resetAndPull();
   }
 
+  /**
+   * Throttled sync used by every activity trigger (activation, window focus,
+   * panel visibility). Also what keeps the session sliding: any request renews a
+   * near-expired access token on its way out, so being active is enough.
+   */
+  public syncOnActivity(): void {
+    void this._syncService?.syncOnOpen();
+  }
+
+  /**
+   * Only interactive sign-in reports "active" — routine token refreshes stay
+   * silent, so this runs exactly when the account may have changed.
+   */
+  private async _handleAuthStateChange(state: AuthState): Promise<void> {
+    if (state === "expired") {
+      await this._handleSessionExpired();
+      return;
+    }
+    if (state === "active") {
+      await this._handleSignedIn();
+    }
+  }
+
+  /**
+   * Teardown after a renewal was rejected. Deliberately narrower than
+   * _handleSignOut: the linked workspace, its name and lastSyncedAt all survive,
+   * because that is exactly what lets queued edits replay after re-auth.
+   */
+  private async _handleSessionExpired(): Promise<void> {
+    log("session expired — pausing sync, local edits kept for replay");
+    await saveHasPendingSync(this._context.workspaceState, true);
+    this._syncService = undefined;
+    this._emitSyncStatus("error", "Session expired. Please sign in again.");
+    await this._pushState();
+  }
+
+  private async _handleSignedIn(): Promise<void> {
+    const user = await this._authService.getUser();
+    if (!user) return;
+
+    const previousOwner = getSyncedUserId(this._context.workspaceState);
+    if (previousOwner && previousOwner !== user.id) {
+      // Different account. /api/sync/push finds-or-creates the remote workspace
+      // by NAME, so replaying here would copy the previous account's todos into
+      // this one. Drop the link instead and let the user pick a workspace.
+      log("signed in as a different account — dropping the workspace link");
+      await saveHasPendingSync(this._context.workspaceState, false);
+      await clearLinkedWorkspace(this._context.workspaceState);
+      await this._pushState();
+      await this._checkAndPromptWorkspaceLink();
+      return;
+    }
+
+    if (!getLinkedWorkspaceId(this._context.workspaceState)) {
+      await this._pushState();
+      await this._checkAndPromptWorkspaceLink();
+      return;
+    }
+
+    await saveSyncedUserId(this._context.workspaceState, user.id);
+    await this.initSync();
+    await this._pushState();
+
+    // A single push IS the whole replay: it sends every todo including the
+    // soft-deleted ones, and the server merges last-write-wins.
+    if (getHasPendingSync(this._context.workspaceState)) {
+      log("replaying queued local changes");
+      void this._syncService?.push();
+    } else {
+      this.syncOnActivity();
+    }
+  }
+
   public resolveWebviewView(
     webviewView: vscode.WebviewView,
     _context: vscode.WebviewViewResolveContext,
@@ -104,7 +184,9 @@ export class TodoViewProvider implements vscode.WebviewViewProvider {
     webviewView.webview.html = this._getHtml(webviewView.webview);
 
     webviewView.onDidChangeVisibility(() => {
-      if (webviewView.visible) this._pushState();
+      if (!webviewView.visible) return;
+      void this._pushState();
+      this.syncOnActivity();
     }, undefined, this._context.subscriptions);
 
     webviewView.webview.onDidReceiveMessage(
@@ -153,24 +235,27 @@ export class TodoViewProvider implements vscode.WebviewViewProvider {
           case "resetLocalData":
             await this.resetLocalData();
             break;
-          case "syncNow": {
-            if (this._syncService) {
-              const pending = getHasPendingSync(this._context.workspaceState);
-              if (pending) {
-                this._syncService.push();
-              } else {
-                this._syncService.pull();
-              }
-            } else {
-              await this._checkAndPromptWorkspaceLink();
-            }
+          case "syncNow":
+            await this.syncNow();
             break;
-          }
         }
       },
       undefined,
       this._context.subscriptions
     );
+  }
+
+  /** Explicit user-initiated sync, shared by the badge and the command. */
+  public async syncNow(): Promise<void> {
+    if (!this._syncService) {
+      await this._checkAndPromptWorkspaceLink();
+      return;
+    }
+    if (getHasPendingSync(this._context.workspaceState)) {
+      await this._syncService.push();
+    } else {
+      await this._syncService.pull();
+    }
   }
 
   public async clearCompleted(): Promise<void> {
@@ -179,9 +264,9 @@ export class TodoViewProvider implements vscode.WebviewViewProvider {
 
   private async _handleSignIn(): Promise<void> {
     try {
-      await this._authService.signIn(this._context, this._apiClient.baseUrl);
-      await this._pushState();
-      await this._checkAndPromptWorkspaceLink();
+      // Success fires onDidChangeAuth("active"), which pushes state, re-links
+      // and replays any queued changes. Nothing to duplicate here.
+      await this._authService.signIn(this._apiClient.baseUrl);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       vscode.window.showErrorMessage(`Sign in failed: ${msg}`);
@@ -198,7 +283,7 @@ export class TodoViewProvider implements vscode.WebviewViewProvider {
 
   private async _handleSignOut(): Promise<void> {
     await this.stopSync();
-    await this._authService.signOut(this._context);
+    await this._authService.signOut(this._apiClient.baseUrl);
     await clearLinkedWorkspace(this._context.workspaceState);
     // Clear any pending indicators since sync is no longer active
     const todos = getTodos(this._context.workspaceState).map(({ pendingSync: _, ...t }) => t);
@@ -209,6 +294,8 @@ export class TodoViewProvider implements vscode.WebviewViewProvider {
   private async _handleLinkWorkspace(workspaceId: string, workspaceName: string): Promise<void> {
     await saveLinkedWorkspaceId(this._context.workspaceState, workspaceId);
     await saveSyncedWorkspaceName(this._context.workspaceState, workspaceName);
+    const user = await this._authService.getUser();
+    if (user) await saveSyncedUserId(this._context.workspaceState, user.id);
     await this.initSync();
     await this._pushState();
     this._syncService?.push();
@@ -329,7 +416,7 @@ export class TodoViewProvider implements vscode.WebviewViewProvider {
     // Filter out soft-deleted todos for the webview
     const todos = allTodos.filter((t) => !t.deletedAt);
     const settings = getSettings(this._context.workspaceState);
-    const user = await this._authService.getUser(this._context);
+    const user = await this._authService.getUser();
     const hasPendingSync = getHasPendingSync(this._context.workspaceState);
     const msg: ExtensionMessage = { type: "setState", todos, settings, user, hasPendingSync };
     this._view.webview.postMessage(msg);

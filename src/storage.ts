@@ -7,6 +7,7 @@ const LAST_SYNCED_AT_KEY = "workspace-todo.lastSyncedAt";
 const SYNCED_WORKSPACE_NAME_KEY = "workspace-todo.syncedWorkspaceName";
 const LINKED_WORKSPACE_ID_KEY = "workspace-todo.linkedWorkspaceId";
 const HAS_PENDING_SYNC_KEY = "workspace-todo.hasPendingSync";
+const SYNCED_USER_ID_KEY = "workspace-todo.syncedUserId";
 
 export function getTodos(state: vscode.Memento): TodoItem[] {
   const raw = state.get<TodoItem[]>(TODOS_KEY, []);
@@ -78,6 +79,7 @@ export async function clearLinkedWorkspace(state: vscode.Memento): Promise<void>
   await state.update(LINKED_WORKSPACE_ID_KEY, undefined);
   await state.update(SYNCED_WORKSPACE_NAME_KEY, undefined);
   await state.update(LAST_SYNCED_AT_KEY, undefined);
+  await state.update(SYNCED_USER_ID_KEY, undefined);
 }
 
 export function getHasPendingSync(state: vscode.Memento): boolean {
@@ -89,4 +91,22 @@ export async function saveHasPendingSync(
   val: boolean
 ): Promise<void> {
   await state.update(HAS_PENDING_SYNC_KEY, val);
+}
+
+/**
+ * The account this workspace's sync link belongs to.
+ *
+ * Guards against cross-account data leaks: /api/sync/push finds-or-creates the
+ * remote workspace by NAME, so replaying queued edits after signing in as a
+ * different account would copy one account's todos into the other.
+ */
+export function getSyncedUserId(state: vscode.Memento): string | undefined {
+  return state.get<string>(SYNCED_USER_ID_KEY);
+}
+
+export async function saveSyncedUserId(
+  state: vscode.Memento,
+  userId: string
+): Promise<void> {
+  await state.update(SYNCED_USER_ID_KEY, userId);
 }

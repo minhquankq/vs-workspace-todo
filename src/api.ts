@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { AuthService } from "./auth";
+import { AuthService, authExpiredError } from "./auth";
 import { TodoItem, Settings, SyncUser, WorkspaceInfo } from "./types";
 
 export interface SyncPayload {
@@ -16,22 +16,31 @@ export interface SyncResponse {
 }
 
 export class ApiClient {
-  constructor(
-    private readonly authService: AuthService,
-    private readonly context: vscode.ExtensionContext
-  ) {}
+  constructor(private readonly authService: AuthService) {}
 
   get baseUrl(): string {
     return vscode.workspace
       .getConfiguration("workspace-todo")
-      .get<string>("apiBaseUrl", "https://vs-todo-website.vercel.app");
+      .get<string>("apiBaseUrl", "https://vs-todo.quans.pro");
   }
 
+  /**
+   * Every request goes through here, which makes it the one place session
+   * renewal has to live.
+   *
+   * Renewal happens twice over: proactively when the access token is close to
+   * expiry, and reactively on a 401. Three independent guards bound the
+   * recursion — `isRetry` caps any logical request at two network attempts,
+   * AuthService renews over bare fetch so a 401 from the renewal endpoint cannot
+   * re-enter this branch, and once the session is dead `canRenew()` is false so
+   * the remaining in-flight requests short-circuit with no network at all.
+   */
   private async _fetch(
     path: string,
-    init?: RequestInit
+    init?: RequestInit,
+    isRetry = false
   ): Promise<Response> {
-    const token = await this.authService.getToken(this.context);
+    const token = await this.authService.getAccessToken(this.baseUrl);
     const headers = {
       "Content-Type": "application/json",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -41,8 +50,11 @@ export class ApiClient {
     const res = await fetch(`${this.baseUrl}${path}`, { ...init, headers });
 
     if (res.status === 401) {
-      await this.authService.signOut(this.context);
-      throw new Error("AUTH_EXPIRED");
+      if (isRetry || !this.authService.canRenew()) throw authExpiredError();
+      // Throws AUTH_EXPIRED if the renewal itself is rejected; a transient
+      // failure surfaces as an ordinary error and is treated as offline.
+      await this.authService.refreshAfter401(token, this.baseUrl);
+      return this._fetch(path, init, true);
     }
 
     return res;
@@ -129,7 +141,9 @@ export class ApiClient {
     const res = await this._fetch(`/api/todos/${todoId}`, {
       method: "DELETE",
     });
-    if (!res.ok && res.status !== 204)
+    // 404 means it is already gone — a replayed delete has done its job, and
+    // treating it as failure would keep the item pending forever.
+    if (!res.ok && res.status !== 204 && res.status !== 404)
       throw new Error(`deleteTodo failed: ${res.status}`);
   }
 

@@ -2,7 +2,7 @@
   "name": "vs-workspace-todo",
   "displayName": "Workspace Todo",
   "description": "Workspace-scoped todo list with markdown support",
-  "version": "2.0.5",
+  "version": "2.1.0",
   "publisher": "quan-vo",
   "icon": "media/icon.png",
   "repository": {
@@ -73,7 +73,7 @@
           "default": false,
           "description": "Hide completed todos from the list."
         },
-         "workspace-todo.apiBaseUrl": {
+        "workspace-todo.apiBaseUrl": {
           "type": "string",
           "default": "https://vs-todo.quans.pro",
           "description": "API base URL for cloud sync."
@@ -85,7 +85,8 @@
     "build": "node esbuild.js",
     "watch": "node esbuild.js --watch",
     "package": "npm run build && vsce package --no-dependencies --allow-missing-repository",
-    "vscode:prepublish": "npm run build"
+    "vscode:prepublish": "npm run build",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
     "@fontsource/jetbrains-mono": "^5.2.8",

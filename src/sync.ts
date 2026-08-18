@@ -14,8 +14,16 @@ import {
   saveHasPendingSync,
 } from "./storage";
 import { TodoItem } from "./types";
+import { isAuthExpired } from "./auth";
+import { describeError, log } from "./log";
 
 type SyncStatus = "syncing" | "synced" | "offline" | "error";
+
+/**
+ * How stale local data must be before an activity trigger actually syncs. This
+ * is the debounce shared by activation, window focus and panel visibility.
+ */
+const STALE_AFTER_MS = 10 * 60 * 1000;
 
 export class SyncService {
   constructor(
@@ -25,6 +33,13 @@ export class SyncService {
     private readonly onStatusChange: (status: SyncStatus, error?: string) => void,
     private readonly onItemSynced: (id: string) => Promise<void>
   ) {}
+
+  /**
+   * The sync currently in flight, if any. Holding the promise rather than a
+   * boolean means concurrent callers can await the running sync instead of
+   * silently returning, which matters for resetAndPull.
+   */
+  private _inFlight?: Promise<void>;
 
   private get _workspaceState() {
     return this.context.workspaceState;
@@ -49,11 +64,23 @@ export class SyncService {
     return name;
   }
 
-  async push(): Promise<void> {
-    const workspaceName = await this.ensureWorkspaceName();
-    if (!workspaceName) return;
+  /**
+   * Concurrent syncs coalesce onto the one already running. The assignment is
+   * synchronous, so callers arriving on the same event-loop turn all see it.
+   */
+  push(): Promise<void> {
+    if (this._inFlight) return this._inFlight;
+    this._inFlight = this._push().finally(() => {
+      this._inFlight = undefined;
+    });
+    return this._inFlight;
+  }
 
+  private async _push(): Promise<void> {
     try {
+      const workspaceName = await this.ensureWorkspaceName();
+      if (!workspaceName) return;
+
       this.onStatusChange("syncing");
       const todos = getTodos(this._workspaceState);
       const settings = getSettings(this._workspaceState);
@@ -72,20 +99,24 @@ export class SyncService {
       this.onStateChange();
       this.onStatusChange("synced");
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      if (msg === "AUTH_EXPIRED") {
-        this.onStatusChange("error", "Session expired. Please sign in again.");
-      } else {
-        this.onStatusChange("offline");
-      }
+      // Unlike pull, a failed push always leaves unsent local work behind.
+      await this._handleError(err, true);
     }
   }
 
-  async pull(): Promise<void> {
-    const workspaceName = await this.ensureWorkspaceName();
-    if (!workspaceName) return;
+  pull(): Promise<void> {
+    if (this._inFlight) return this._inFlight;
+    this._inFlight = this._pull().finally(() => {
+      this._inFlight = undefined;
+    });
+    return this._inFlight;
+  }
 
+  private async _pull(): Promise<void> {
     try {
+      const workspaceName = await this.ensureWorkspaceName();
+      if (!workspaceName) return;
+
       this.onStatusChange("syncing");
       const since = getLastSyncedAt(this._workspaceState);
       const response = await this.apiClient.pullSync(workspaceName, since);
@@ -95,15 +126,19 @@ export class SyncService {
       this.onStateChange();
       this.onStatusChange("synced");
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      if (msg === "AUTH_EXPIRED") {
-        this.onStatusChange("error", "Session expired. Please sign in again.");
-      } else {
-        this.onStatusChange("offline");
-      }
+      // A failed pull has nothing local to replay, and marking pending here
+      // would wrongly turn the next sync into a push. Staleness is already
+      // recorded by lastSyncedAt.
+      await this._handleError(err, false);
     }
   }
 
+  /**
+   * The single throttled entry point for every activity trigger: activation,
+   * window focus, and the panel becoming visible. Each of those is also what
+   * keeps the session sliding forward, since any request renews a near-expired
+   * access token on its way out.
+   */
   async syncOnOpen(): Promise<void> {
     const pending = getHasPendingSync(this._workspaceState);
     if (pending) {
@@ -112,22 +147,26 @@ export class SyncService {
     }
 
     const lastSyncedAt = getLastSyncedAt(this._workspaceState);
-    const ONE_HOUR_MS = 60 * 60 * 1000;
-    if (lastSyncedAt && Date.now() - lastSyncedAt < ONE_HOUR_MS) {
+    if (lastSyncedAt && Date.now() - lastSyncedAt < STALE_AFTER_MS) {
       return;
     }
 
     await this.pull();
   }
 
-  private async _handleCrudError(err: unknown): Promise<void> {
-    const msg = err instanceof Error ? err.message : String(err);
-    if (msg === "AUTH_EXPIRED") {
-      this.onStatusChange("error", "Session expired. Please sign in again.");
-    } else {
+  /**
+   * `markPending` says whether local work was left unsent. AUTH_EXPIRED always
+   * marks it, so edits made while the session was dead replay after re-auth.
+   */
+  private async _handleError(err: unknown, markPending: boolean): Promise<void> {
+    if (isAuthExpired(err)) {
       await saveHasPendingSync(this._workspaceState, true);
-      this.onStatusChange("offline");
+      this.onStatusChange("error", "Session expired. Please sign in again.");
+      return;
     }
+    log(`sync failed: ${describeError(err)}`);
+    if (markPending) await saveHasPendingSync(this._workspaceState, true);
+    this.onStatusChange("offline");
   }
 
   async tryCreate(todo: TodoItem): Promise<void> {
@@ -140,7 +179,7 @@ export class SyncService {
       await this.onItemSynced(todo.id);
       this.onStatusChange("synced");
     } catch (err) {
-      await this._handleCrudError(err);
+      await this._handleError(err, true);
     }
   }
 
@@ -154,7 +193,7 @@ export class SyncService {
       await this.onItemSynced(id);
       this.onStatusChange("synced");
     } catch (err) {
-      await this._handleCrudError(err);
+      await this._handleError(err, true);
     }
   }
 
@@ -164,7 +203,7 @@ export class SyncService {
       await this.apiClient.deleteTodo(id);
       this.onStatusChange("synced");
     } catch (err) {
-      await this._handleCrudError(err);
+      await this._handleError(err, true);
     }
   }
 
@@ -177,11 +216,14 @@ export class SyncService {
       await this.apiClient.reorderTodos(workspaceId, order);
       this.onStatusChange("synced");
     } catch (err) {
-      await this._handleCrudError(err);
+      await this._handleError(err, true);
     }
   }
 
   async resetAndPull(): Promise<void> {
+    // Let any in-flight sync settle first, so the pull below is not coalesced
+    // away — otherwise the user would be left looking at an empty list.
+    await this._inFlight?.catch(() => undefined);
     await saveTodos(this._workspaceState, []);
     await clearLastSyncedAt(this._workspaceState);
     await saveHasPendingSync(this._workspaceState, false);
