@@ -2,7 +2,7 @@
   "name": "vs-workspace-todo",
   "displayName": "Workspace Todo",
   "description": "Workspace-scoped todo list with markdown support",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "publisher": "quan-vo",
   "icon": "media/icon.png",
   "repository": {

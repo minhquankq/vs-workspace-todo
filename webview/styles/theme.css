@@ -616,7 +616,7 @@ body {
   height: 24px;
   border: none;
   border-radius: 5px;
-  background: #333;
+  background: var(--hover);
   color: var(--fg-3);
   cursor: pointer;
   display: flex;
